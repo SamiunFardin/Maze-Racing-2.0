@@ -1,52 +1,269 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbo Maze Racer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Turbo Maze Racer - Complete Edition</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="bg-slate-900 text-white font-sans h-screen flex flex-col justify-center items-center overflow-hidden">
+<body class="bg-slate-950 text-white flex flex-col h-screen w-screen overflow-hidden">
 
-    <!-- Auth / Main Menu Screen -->
-    <div id="menu-screen" class="flex flex-col items-center space-y-6 p-8 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 w-96">
-        <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">TURBO MAZE RACER</h1>
-        
-        <div class="w-full flex flex-col space-y-3">
-            <input type="text" id="username-input" placeholder="Username" class="p-3 bg-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400">
-            <input type="password" id="password-input" placeholder="Password" class="p-3 bg-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400">
-            <div class="flex items-center justify-between bg-slate-700 p-3 rounded-lg">
-                <span class="text-sm text-slate-300">Car Color:</span>
-                <input type="color" id="car-color-picker" value="#3b82f6" class="w-10 h-10 rounded cursor-pointer bg-transparent">
-            </div>
-            <button onclick="handleLogin()" class="w-full py-3 bg-cyan-500 hover:bg-cyan-600 font-bold rounded-lg transition shadow-lg">START ENGINE</button>
-        </div>
+  <!-- TOP HUD HEADER -->
+  <div id="game-hud" class="absolute top-0 left-0 right-0 z-40 flex justify-between items-center px-4 py-2 bg-slate-900/85 backdrop-blur-md border-b border-slate-800 pointer-events-auto">
+    <div class="flex items-center space-x-3">
+      <button id="btn-back-menu" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center justify-center">
+        <i class="fa-solid fa-house text-sm"></i>
+      </button>
+      <div>
+        <div id="hud-level-title" class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Rookie Sprint 1</div>
+        <div id="hud-timer" class="text-lg font-mono font-bold text-amber-400">00:00.000</div>
+      </div>
     </div>
 
-    <!-- Game HUD & Canvas Viewport -->
-    <div id="game-container" class="hidden relative flex flex-col items-center">
-        <div id="hud" class="absolute top-4 left-4 z-10 flex space-x-4 bg-slate-800/80 px-4 py-2 rounded-lg backdrop-blur border border-slate-700">
-            <span>Coins: <strong id="hud-coins" class="text-yellow-400">50</strong></span>
-            <span>Speed: <strong id="hud-speed" class="text-cyan-400">0.0</strong></span>
+    <div class="flex items-center space-x-2">
+      <div class="bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-lg flex items-center space-x-1.5 mr-1">
+        <i class="fa-solid fa-coins text-yellow-400 text-xs"></i>
+        <span id="hud-coins-val" class="font-mono font-bold text-yellow-400 text-xs">100</span>
+      </div>
+      <button id="btn-pause-game" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow-md flex items-center space-x-1">
+        <i class="fa-solid fa-pause"></i>
+        <span>Pause</span>
+      </button>
+      <button id="btn-edit-controls-hud" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold shadow-md flex items-center space-x-1">
+        <i class="fa-solid fa-up-down-left-right"></i>
+        <span class="hidden sm:inline">Move Buttons</span>
+      </button>
+      <button id="btn-full-map" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow-md flex items-center space-x-1">
+        <i class="fa-solid fa-map"></i>
+        <span>Full Map</span>
+      </button>
+      <button id="btn-open-settings" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-1.5 rounded-lg border border-slate-700">
+        <i class="fa-solid fa-gear text-sm"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- EDIT LAYOUT BANNER -->
+  <div id="edit-layout-banner" class="absolute top-14 left-1/2 -translate-x-1/2 z-40 bg-amber-500 text-slate-950 font-bold text-xs px-4 py-1.5 rounded-full shadow-lg hidden flex items-center space-x-3 pointer-events-auto">
+    <span> Drag control elements to customize position</span>
+    <button id="btn-reset-controls" class="bg-slate-900 text-white px-2 py-0.5 rounded text-[10px] uppercase">Reset</button>
+    <button id="btn-save-controls" class="bg-emerald-700 text-white px-2.5 py-0.5 rounded text-[10px] uppercase">Done</button>
+  </div>
+
+  <!-- CANVAS CONTAINER -->
+  <div id="canvas-container" class="relative flex-1 w-full h-full overflow-hidden">
+    <canvas id="gameCanvas" class="w-full h-full"></canvas>
+
+    <!-- TOUCH CONTROLS -->
+    <div id="ctrl-wheel-wrapper" class="floating-control hidden" style="bottom: 16px; left: 24px;">
+      <div id="steering-wheel-container">
+        <div id="steering-wheel">
+          <div class="wheel-center">
+            <i class="fa-solid fa-car-side text-sm text-white"></i>
+          </div>
         </div>
-        <canvas id="gameCanvas" width="800" height="600" class="border-4 border-slate-700 rounded-lg shadow-2xl bg-slate-950"></canvas>
-        
-        <!-- Touch Controls for Mobile -->
-        <div class="absolute bottom-6 flex justify-between w-full px-8 pointer-events-none">
-            <div class="flex space-x-3 pointer-events-auto">
-                <button id="btn-left" class="w-16 h-16 bg-slate-800/80 border border-slate-600 rounded-full text-xl font-bold active:bg-cyan-500">◀</button>
-                <button id="btn-right" class="w-16 h-16 bg-slate-800/80 border border-slate-600 rounded-full text-xl font-bold active:bg-cyan-500">▶</button>
-            </div>
-            <div class="flex space-x-3 pointer-events-auto">
-                <button id="btn-brake" class="w-16 h-16 bg-red-600/80 border border-red-500 rounded-full text-sm font-bold active:bg-red-700">BRAKE</button>
-                <button id="btn-gas" class="w-16 h-16 bg-cyan-500/80 border border-cyan-400 rounded-full text-sm font-bold active:bg-cyan-600">GAS</button>
-            </div>
-        </div>
+      </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
-    <script src="js/game.js"></script>
-    <script src="js/app.js"></script>
+    <div id="ctrl-buttons-wrapper" class="floating-control flex space-x-3" style="bottom: 24px; left: 24px;">
+      <button id="btn-steer-left" class="pedal w-16 h-16 bg-slate-900/90 border-2 border-blue-500 rounded-2xl flex items-center justify-center text-blue-400 text-2xl shadow-lg active:bg-blue-600 active:text-white">
+        <i class="fa-solid fa-caret-left"></i>
+      </button>
+      <button id="btn-steer-right" class="pedal w-16 h-16 bg-slate-900/90 border-2 border-blue-500 rounded-2xl flex items-center justify-center text-blue-400 text-2xl shadow-lg active:bg-blue-600 active:text-white">
+        <i class="fa-solid fa-caret-right"></i>
+      </button>
+    </div>
+
+    <div id="ctrl-brake-wrapper" class="floating-control flex flex-col items-center" style="bottom: 20px; right: 100px;">
+      <span class="text-[9px] font-bold text-rose-400 uppercase tracking-widest mb-1">Brake</span>
+      <button id="btn-pedal-brake" class="pedal w-14 h-24 bg-gradient-to-b from-rose-600 to-rose-800 border-2 border-rose-400 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg active:bg-rose-500">
+        <i class="fa-solid fa-angles-down"></i>
+      </button>
+    </div>
+
+    <div id="ctrl-gas-wrapper" class="floating-control flex flex-col items-center" style="bottom: 20px; right: 24px;">
+      <span class="text-[9px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Gas</span>
+      <button id="btn-pedal-gas" class="pedal w-14 h-28 bg-gradient-to-b from-emerald-500 to-emerald-700 border-2 border-emerald-300 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg active:bg-emerald-400">
+        <i class="fa-solid fa-angles-up"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- AUTHENTICATION MODAL -->
+  <div id="modal-auth" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
+      <h1 class="text-3xl font-black italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400 neon-text">
+        TURBO MAZE
+      </h1>
+      <p class="text-xs text-slate-400">Login or Create Account to Save Cars & Stats</p>
+
+      <div class="space-y-3">
+        <input type="text" id="auth-username" placeholder="Driver Username" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500">
+        <input type="password" id="auth-password" placeholder="Password" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500">
+        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
+          <span class="text-xs text-slate-300 font-bold">Car Paint:</span>
+          <input type="color" id="auth-color-picker" value="#3b82f6" class="w-8 h-8 rounded cursor-pointer bg-transparent border-none">
+        </div>
+        <button id="auth-btn-submit" onclick="handleAuthLogin()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg text-sm">
+          ENTER GARAGE
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN MENU MODAL -->
+  <div id="modal-menu" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
+      <div>
+        <h1 class="text-4xl font-black italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400 neon-text">
+          TURBO MAZE
+        </h1>
+        <p class="text-slate-400 text-xs mt-1">100 Level Campaign • Daily Challenge • 7-Stat Garage</p>
+      </div>
+
+      <div class="space-y-2">
+        <button id="menu-btn-play" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
+          <i class="fa-solid fa-flag-checkered"></i>
+          <span>100 Level Campaign</span>
+        </button>
+
+        <button id="menu-btn-daily" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
+          <i class="fa-solid fa-calendar-day"></i>
+          <span>24-Hour Daily Challenge</span>
+        </button>
+
+        <button id="menu-btn-multiplayer" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
+          <i class="fa-solid fa-users"></i>
+          <span>Multiplayer Queue (1 Coin Entry)</span>
+        </button>
+
+        <button id="menu-btn-garage" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
+          <i class="fa-solid fa-wrench text-yellow-300"></i>
+          <span>7-Stat Tuning Garage</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 100 LEVEL CAMPAIGN MODAL -->
+  <div id="modal-levels" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
+    <div class="max-w-2xl w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-layer-group text-blue-400"></i> Campaign Circuit (100 Levels)
+        </h2>
+        <button class="btn-close-modal text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div class="flex overflow-x-auto space-x-2 pb-1 border-b border-slate-800" id="category-tabs"></div>
+      <div id="levels-container" class="space-y-2.5 overflow-y-auto pr-1 flex-1"></div>
+    </div>
+  </div>
+
+  <!-- 7-STAT DYNAMIC TUNING GARAGE MODAL -->
+  <div id="modal-garage" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-wrench text-emerald-400"></i> 7-Stat Tuning Garage
+        </h2>
+        <button class="btn-close-modal text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div id="garage-stats-container" class="space-y-3 overflow-y-auto pr-1 flex-1"></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL WITH BGM & SFX VOLUME TOGGLES -->
+  <div id="modal-settings" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-blue-400"></i> Game Preferences
+        </h2>
+        <button class="btn-close-modal text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs uppercase text-slate-400 font-bold mb-2">Audio Controls</label>
+          <div class="space-y-3 bg-slate-800 p-3 rounded-xl border border-slate-700">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold text-white">Background Music (BGM)</span>
+              <input type="checkbox" id="setting-bgm-toggle" checked class="w-4 h-4 text-blue-600 rounded">
+            </div>
+            <input type="range" id="setting-bgm-vol" min="0" max="1" step="0.1" value="0.8" class="w-full">
+            
+            <div class="flex justify-between items-center pt-2">
+              <span class="text-xs font-bold text-white">Sound Effects (SFX)</span>
+              <input type="checkbox" id="setting-sfx-toggle" checked class="w-4 h-4 text-blue-600 rounded">
+            </div>
+            <input type="range" id="setting-sfx-vol" min="0" max="1" step="0.1" value="1.0" class="w-full">
+          </div>
+        </div>
+
+        <div>
+          <button id="btn-start-adjust-controls" class="w-full py-2.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500 text-amber-300 font-bold rounded-xl text-xs flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-up-down-left-right"></i>
+            <span>Drag & Customize Touch Buttons</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FULL MAZE MAP OVERLAY MODAL -->
+  <div id="modal-full-map" class="fixed inset-0 z-40 bg-slate-950/95 backdrop-blur-md hidden flex flex-col items-center justify-center p-4">
+    <div class="w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-2xl p-4 flex flex-col h-[88vh]">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+        <span id="full-map-title" class="font-bold text-white text-sm">Full Maze View</span>
+        <button id="btn-close-full-map" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded-lg text-xs font-bold border border-slate-700">Close Map</button>
+      </div>
+      <div class="flex-1 w-full h-full flex items-center justify-center bg-slate-950 rounded-xl overflow-hidden p-2">
+        <canvas id="fullMapCanvas" class="max-w-full max-h-full object-contain"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAUSE MODAL -->
+  <div id="modal-pause" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
+      <h2 class="text-2xl font-black text-white">GAME PAUSED</h2>
+      <div class="space-y-2 pt-2">
+        <button id="pause-btn-resume" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm">Resume</button>
+        <button id="pause-btn-restart" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-sm">Restart</button>
+        <button id="pause-btn-menu" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-sm">Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VICTORY MODAL -->
+  <div id="modal-victory" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-slate-900 border border-emerald-500/50 rounded-2xl shadow-2xl p-5 text-center space-y-4">
+      <h2 class="text-2xl font-black text-white">MAZE CONQUERED!</h2>
+      <div class="bg-slate-800/80 rounded-xl p-3.5 border border-slate-700">
+        <div class="text-[10px] text-slate-400 font-bold uppercase">Time Recorded</div>
+        <div id="victory-final-time" class="text-2xl font-mono font-bold text-amber-400 my-0.5">00:45.420</div>
+        <div id="victory-coin-payout" class="text-xs font-bold text-yellow-400 mt-1">+10 Coins Earned!</div>
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <button id="victory-btn-home" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs">Home</button>
+        <button id="victory-btn-restart" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs">Retry</button>
+        <button id="victory-btn-next" class="py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs">Next Level</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
