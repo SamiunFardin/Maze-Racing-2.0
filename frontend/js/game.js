@@ -33,7 +33,7 @@ window.addEventListener('keyup', (e) => {
     if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = false;
 });
 
-// Touch Bindings for Mobile / Capacitor
+// Touch Bindings for Mobile
 function setupTouchControls() {
     const bindTouch = (id, prop) => {
         const el = document.getElementById(id);
@@ -49,7 +49,6 @@ function setupTouchControls() {
     bindTouch('btn-right', 'right');
 }
 
-// Procedural DFS Maze Grid generation (Placeholder world representation)
 const tileSize = 40;
 const mazeCols = 25;
 const mazeRows = 25;
@@ -72,13 +71,12 @@ function updatePhysics() {
     const worldHeight = mazeRows * tileSize;
     
     if (car.x < 20 || car.x > worldWidth - 20 || car.y < 20 || car.y > worldHeight - 20) {
-        // Recoil backward proportional to speed
         car.speed = -car.speed * 0.4;
         car.x = Math.max(20, Math.min(car.x, worldWidth - 20));
         car.y = Math.max(20, Math.min(car.y, worldHeight - 20));
     }
 
-    // Sync position via Socket.io for multiplayer ghosts
+    // Safely emit position if connected and room ID exists
     if (typeof socket !== 'undefined' && socket.connected && window.currentRoomId) {
         socket.emit('player_move', {
             room_id: window.currentRoomId,
@@ -115,7 +113,7 @@ function render() {
         ctx.stroke();
     }
 
-    // Render Multiplayer Ghosts (Transparent & Non-colliding)
+    // Render Multiplayer Ghosts
     for (let sid in multiplayerGhosts) {
         let ghost = multiplayerGhosts[sid];
         ctx.save();
@@ -134,12 +132,11 @@ function render() {
     ctx.fillStyle = car.color;
     ctx.fillRect(-15, -10, 30, 20);
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(4, -3, 6, 6); // Windshield / hood indicator
+    ctx.fillRect(4, -3, 6, 6);
     ctx.restore();
 
     ctx.restore();
 
-    // HUD Updates
     const speedEl = document.getElementById('hud-speed');
     if (speedEl) speedEl.innerText = Math.abs(car.speed).toFixed(1);
 }
