@@ -27,3 +27,4 @@ def get_level_leaderboard(level_id: int):
     lb = LEVEL_LEADERBOARDS.get(level_id, {})
     sorted_lb = sorted(lb.items(), key=lambda x: x[1])[:100]
     return [{"rank": i+1, "username": item[0], "time": item[1]} for i, item in enumerate(sorted_lb)]
+    
