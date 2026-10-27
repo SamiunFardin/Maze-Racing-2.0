@@ -1,7 +1,87 @@
-body {
-    user-select: none;
-    -webkit-user-select: none;
+* {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  box-sizing: border-box;
+}
+button {
+  touch-action: manipulation;
+}
+body, html {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #0b0f19;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 canvas {
-    touch-action: none;
+  display: block;
+}
+.neon-text {
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.7);
+}
+.floating-control {
+  position: absolute;
+  z-index: 30;
+  touch-action: none;
+  pointer-events: auto;
+}
+.edit-mode-active .floating-control {
+  outline: 2px dashed #f59e0b;
+  outline-offset: 4px;
+  cursor: move;
+}
+#steering-wheel-container {
+  width: 140px;
+  height: 140px;
+  position: relative;
+  touch-action: none;
+}
+#steering-wheel {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #334155 35%, #1e293b 75%, #0f172a 100%);
+  border: 7px solid #3b82f6;
+  box-shadow: inset 0 0 15px rgba(0,0,0,0.9), 0 0 18px rgba(59, 130, 246, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.03s linear;
+}
+#steering-wheel::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 12px;
+  background: #3b82f6;
+}
+#steering-wheel::after {
+  content: '';
+  position: absolute;
+  height: 100%;
+  width: 12px;
+  background: #3b82f6;
+}
+.wheel-center {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #0284c7;
+  border: 3px solid #38bdf8;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+}
+.pedal {
+  touch-action: none;
+  transition: transform 0.08s ease-out, filter 0.08s;
+}
+.pedal:active, .pedal.active {
+  transform: scale(0.92);
+  filter: brightness(1.25);
 }
