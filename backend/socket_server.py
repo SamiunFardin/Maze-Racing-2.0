@@ -1,9 +1,14 @@
 import socketio
 import random
+from main import app as fastapi_app
 
+# Initialize AsyncServer with CORS allowed
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
-socket_app = socketio.ASGIApp(sio)
 
+# Combine Socket.IO with FastAPI into a single ASGI app targetable by Uvicorn
+socket_app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)
+
+# Multiplayer rooms state
 # room_id -> { grid_size, players: {sid: {username, color, x, y, angle}}, status: 'waiting'/'countdown'/'racing' }
 rooms = {}
 
