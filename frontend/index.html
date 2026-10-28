@@ -10,7 +10,7 @@
 </head>
 <body class="bg-slate-950 text-white flex flex-col h-screen w-screen overflow-hidden">
 
-  <!-- SPLASH SCREEN WITH TAGLINE & TIPS -->
+  <!-- SPLASH SCREEN -->
   <div id="splash-screen" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center space-y-4 px-6 text-center transition-opacity duration-700">
     <div class="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-500/50 animate-bounce">
       <i class="fa-solid fa-car-side text-4xl text-white"></i>
@@ -67,32 +67,26 @@
     <button id="btn-save-controls" class="bg-emerald-700 text-white px-2.5 py-0.5 rounded text-[10px] uppercase">Done</button>
   </div>
 
-  <!-- CANVAS CONTAINER -->
+  <!-- CANVAS CONTAINER & MOBILE SAFE FLOATING CONTROLS -->
   <div id="canvas-container" class="relative flex-1 w-full h-full overflow-hidden">
     <canvas id="gameCanvas" class="w-full h-full"></canvas>
 
-    <!-- TOUCH CONTROLS -->
-    <div id="ctrl-wheel-wrapper" class="floating-control hidden" style="bottom: 16px; left: 24px;">
-      <div id="steering-wheel-container">
-        <div id="steering-wheel">
-          <div class="wheel-center"><i class="fa-solid fa-car-side text-sm text-white"></i></div>
+    <div id="floating-controls-container" class="absolute inset-0 pointer-events-none z-30">
+      <div id="ctrl-buttons-wrapper" class="absolute flex space-x-3 pointer-events-auto cursor-grab" style="bottom: 24px; left: 24px;">
+        <button id="btn-steer-left" class="pedal w-16 h-16 bg-slate-900/90 border-2 border-blue-500 rounded-2xl flex items-center justify-center text-blue-400 text-2xl shadow-lg"><i class="fa-solid fa-caret-left"></i></button>
+        <button id="btn-steer-right" class="pedal w-16 h-16 bg-slate-900/90 border-2 border-blue-500 rounded-2xl flex items-center justify-center text-blue-400 text-2xl shadow-lg"><i class="fa-solid fa-caret-right"></i></button>
+      </div>
+
+      <div id="ctrl-pedals-wrapper" class="absolute flex space-x-3 pointer-events-auto cursor-grab" style="bottom: 20px; right: 24px;">
+        <div class="flex flex-col items-center">
+          <span class="text-[9px] font-bold text-rose-400 uppercase tracking-widest mb-1">Brake</span>
+          <button id="btn-pedal-brake" class="pedal w-14 h-24 bg-gradient-to-b from-rose-600 to-rose-800 border-2 border-rose-400 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg"><i class="fa-solid fa-angles-down"></i></button>
+        </div>
+        <div class="flex flex-col items-center">
+          <span class="text-[9px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Gas</span>
+          <button id="btn-pedal-gas" class="pedal w-14 h-28 bg-gradient-to-b from-emerald-500 to-emerald-700 border-2 border-emerald-300 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg"><i class="fa-solid fa-angles-up"></i></button>
         </div>
       </div>
-    </div>
-
-    <div id="ctrl-buttons-wrapper" class="floating-control flex space-x-3" style="bottom: 24px; left: 24px;">
-      <button id="btn-steer-left" class="pedal w-16 h-16 bg-slate-900/90 border-2 border-blue-500 rounded-2xl flex items-center justify-center text-blue-400 text-2xl shadow-lg"><i class="fa-solid fa-caret-left"></i></button>
-      <button id="btn-steer-right" class="pedal w-16 h-16 bg-slate-900/90 border-2 border-blue-500 rounded-2xl flex items-center justify-center text-blue-400 text-2xl shadow-lg"><i class="fa-solid fa-caret-right"></i></button>
-    </div>
-
-    <div id="ctrl-brake-wrapper" class="floating-control flex flex-col items-center" style="bottom: 20px; right: 100px;">
-      <span class="text-[9px] font-bold text-rose-400 uppercase tracking-widest mb-1">Brake</span>
-      <button id="btn-pedal-brake" class="pedal w-14 h-24 bg-gradient-to-b from-rose-600 to-rose-800 border-2 border-rose-400 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg"><i class="fa-solid fa-angles-down"></i></button>
-    </div>
-
-    <div id="ctrl-gas-wrapper" class="floating-control flex flex-col items-center" style="bottom: 20px; right: 24px;">
-      <span class="text-[9px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Gas</span>
-      <button id="btn-pedal-gas" class="pedal w-14 h-28 bg-gradient-to-b from-emerald-500 to-emerald-700 border-2 border-emerald-300 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg"><i class="fa-solid fa-angles-up"></i></button>
     </div>
   </div>
 
@@ -116,6 +110,21 @@
         </div>
 
         <button id="auth-btn-submit" onclick="submitAuth()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg text-sm">LOGIN</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROL ADJUSTMENT PROMPT MODAL -->
+  <div id="modal-adjust-prompt" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
+      <div class="w-12 h-12 bg-blue-500/20 border-2 border-blue-400 rounded-full flex items-center justify-center mx-auto text-blue-400 text-xl">
+        <i class="fa-solid fa-gamepad"></i>
+      </div>
+      <h2 class="text-xl font-bold text-white">Adjust Control Layout?</h2>
+      <p class="text-xs text-slate-400">Would you like to customize your touch control button positions for maximum comfort?</p>
+      <div class="grid grid-cols-2 gap-2 pt-2">
+        <button onclick="skipControlAdjustment()" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs">Skip</button>
+        <button onclick="startControlAdjustment()" class="py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs">Adjust Now</button>
       </div>
     </div>
   </div>
@@ -147,7 +156,7 @@
         <button onclick="openLevelsModal()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
           <i class="fa-solid fa-flag-checkered"></i><span>100 Level Campaign</span>
         </button>
-        <button onclick="startDailyChallenge()" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
+        <button onclick="openDailyChallengeMenu()" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
           <i class="fa-solid fa-calendar-day"></i><span>24-Hour Daily Challenge</span>
         </button>
         <button onclick="openMultiplayerSizeModal()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
@@ -164,11 +173,27 @@
     </div>
   </div>
 
+  <!-- DAILY CHALLENGE MENU MODAL -->
+  <div id="modal-daily-menu" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
+    <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
+      <div class="w-12 h-12 bg-amber-500/20 border-2 border-amber-400 rounded-full flex items-center justify-center mx-auto text-amber-400 text-xl">
+        <i class="fa-solid fa-calendar-day"></i>
+      </div>
+      <h2 class="text-xl font-bold text-white">Daily Challenge Arena</h2>
+      <p class="text-xs text-slate-400">Compete on today's globally synced 50x50 procedural track!</p>
+      <div class="space-y-2 pt-2">
+        <button onclick="startDailyChallenge()" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-sm shadow-lg">Start Race</button>
+        <button onclick="openDailyLeaderboard()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700">View Leaderboard</button>
+        <button onclick="closeModal('modal-daily-menu'); openModal('modal-menu');" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-xl">Back</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MULTIPLAYER SIZE SELECTION MODAL -->
   <div id="modal-mp-size" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
       <h2 class="text-xl font-bold text-white">Select Multiplayer Grid</h2>
-      <p class="text-xs text-slate-400">Entry fee: 1 Coin. Larger grids yield massive payout multipliers!</p>
+      <p class="text-xs text-slate-400">Entry fee: 1 Coin (deducted upon race start). Larger grids yield massive payout multipliers!</p>
       
       <div class="grid grid-cols-2 gap-2">
         <button onclick="joinMultiplayerWithGrid(25)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">25x25 (1x)</button>
@@ -230,14 +255,13 @@
     </div>
   </div>
 
-  <!-- CAMPAIGN MODAL -->
+  <!-- CAMPAIGN MODAL (SCROLLING LEVELS) -->
   <div id="modal-levels" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-2xl w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-3">
         <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-layer-group text-blue-400"></i> Campaign (100 Levels)</h2>
         <button class="btn-close-modal text-slate-400 hover:text-white p-1" onclick="closeModal('modal-levels')"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
-      <div class="flex overflow-x-auto space-x-2 pb-1 border-b border-slate-800" id="category-tabs"></div>
       <div id="levels-container" class="space-y-2.5 overflow-y-auto pr-1 flex-1"></div>
     </div>
   </div>
@@ -255,7 +279,7 @@
 
   <!-- SETTINGS MODAL -->
   <div id="modal-settings" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
-    <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4">
+    <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b border-slate-800 pb-3">
         <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-sliders text-blue-400"></i> Settings</h2>
         <button class="btn-close-modal text-slate-400 hover:text-white p-1" onclick="closeModal('modal-settings')"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -265,6 +289,14 @@
         <div class="flex items-center justify-between bg-slate-800 px-4 py-3 rounded-xl border border-slate-700">
           <span class="text-xs text-slate-300 font-bold">Car Paint Color:</span>
           <input type="color" id="settings-color-picker" value="#3b82f6" onchange="updateCarColor(this.value)" class="w-8 h-8 rounded cursor-pointer bg-transparent border-none">
+        </div>
+
+        <div class="bg-slate-800 px-4 py-3 rounded-xl border border-slate-700 space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-xs text-slate-300 font-bold">Touch Control Layout</span>
+            <button onclick="startControlAdjustment()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs">Reposition</button>
+          </div>
+          <div class="text-[10px] text-slate-400">Adjust the screen placement of steering and pedal controls.</div>
         </div>
 
         <div>
@@ -286,18 +318,56 @@
     </div>
   </div>
 
-  <!-- LEADERBOARDS MODAL -->
+  <!-- LEADERBOARDS MODAL WITH WEEKLY REWARDS -->
   <div id="modal-leaderboards" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[85vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
         <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-trophy text-amber-400"></i> Track Records</h2>
         <button class="btn-close-modal text-slate-400 hover:text-white p-1" onclick="closeModal('modal-leaderboards')"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
+
+      <!-- Weekly Reward Banner -->
+      <div class="bg-gradient-to-r from-amber-900/40 to-yellow-900/40 border border-amber-500/40 p-3 rounded-xl flex justify-between items-center">
+        <div>
+          <div class="text-[10px] uppercase font-bold text-amber-400">Weekly Reward Reset</div>
+          <div id="weekly-timer-val" class="text-xs font-mono font-bold text-white mt-0.5">06d 14h 32m</div>
+        </div>
+        <button onclick="openRewardTiersModal()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow">Reward Tiers</button>
+      </div>
+
       <div>
-        <label class="block text-[10px] uppercase text-slate-400 font-bold mb-1">Select Level</label>
+        <label class="block text-[10px] uppercase text-slate-400 font-bold mb-1">Select Track / Level</label>
         <select id="lb-level-select" onchange="fetchLeaderboard(this.value)" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-bold focus:outline-none focus:border-blue-500"></select>
       </div>
       <div id="lb-list-container" class="space-y-2 overflow-y-auto flex-1 pr-1"></div>
+    </div>
+  </div>
+
+  <!-- REWARD TIERS MODAL -->
+  <div id="modal-reward-tiers" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
+    <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h2 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-award text-yellow-400"></i> Weekly Reward Tiers</h2>
+        <button class="btn-close-modal text-slate-400 hover:text-white p-1" onclick="closeModal('modal-reward-tiers')"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="space-y-2 text-xs">
+        <div class="bg-slate-800 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-amber-400">Rank #1</span>
+          <span class="font-mono text-yellow-400 font-bold">500 Coins + Gold Crown</span>
+        </div>
+        <div class="bg-slate-800 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-200">Rank #2 - #5</span>
+          <span class="font-mono text-yellow-400 font-bold">200 Coins</span>
+        </div>
+        <div class="bg-slate-800 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-300">Rank #6 - #10</span>
+          <span class="font-mono text-yellow-400 font-bold">100 Coins</span>
+        </div>
+        <div class="bg-slate-800 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-400">Rank #11 - #25</span>
+          <span class="font-mono text-yellow-400 font-bold">50 Coins</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -314,22 +384,24 @@
     </div>
   </div>
 
-  <!-- PAUSE MODAL -->
+  <!-- PAUSE MODAL WITH GARAGE & SETTINGS -->
   <div id="modal-pause" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
+    <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-3">
       <h2 class="text-2xl font-black text-white">GAME PAUSED</h2>
       <div class="space-y-2 pt-2">
         <button onclick="togglePause()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm">Resume</button>
-        <button onclick="restartCurrentLevel()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-sm">Restart</button>
-        <button onclick="returnToMenuFromPause()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-sm">Main Menu</button>
+        <button onclick="openGarageModal()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs">Tuning Garage</button>
+        <button onclick="openSettingsModal()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-xs">Settings</button>
+        <button onclick="restartCurrentLevel()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-xs">Restart Level</button>
+        <button onclick="returnToMenuFromPause()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-xs">Main Menu</button>
       </div>
     </div>
   </div>
 
-  <!-- 3-SECOND COUNTDOWN WITH TIPS -->
-  <div id="modal-countdown" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex flex-col items-center justify-center space-y-6 px-6 text-center">
-    <div id="countdown-number" class="text-8xl font-black italic tracking-wider text-amber-400 neon-text animate-pulse">3</div>
-    <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl max-w-sm w-full shadow-xl">
+  <!-- TRANSPARENT 3-SECOND COUNTDOWN WITH TIPS -->
+  <div id="modal-countdown" class="fixed inset-0 z-50 bg-slate-950/30 backdrop-blur-[2px] hidden flex flex-col items-center justify-center space-y-6 px-6 text-center pointer-events-none">
+    <div id="countdown-number" class="text-6xl font-black italic tracking-wider text-amber-400 neon-text animate-pulse">3</div>
+    <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl max-w-sm w-full shadow-2xl pointer-events-auto">
       <div class="text-[10px] text-amber-400 font-bold uppercase mb-1"><i class="fa-solid fa-lightbulb mr-1"></i> Pro Tip</div>
       <div id="countdown-tip-text" class="text-xs text-slate-300">Upgrade your car from the garage for better performance and higher top speeds!</div>
     </div>
