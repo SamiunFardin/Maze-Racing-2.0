@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 import random
 import datetime
-from backend.database import USERS_DB, get_or_create_user, LEVEL_LEADERBOARDS
+from backend.database import USERS_DB, get_or_create_user, LEVEL_LEADERBOARDS, DAILY_LEADERBOARD
 
 app = FastAPI(title="Turbo Maze Racer API")
 
@@ -37,14 +37,22 @@ async def complete_campaign(request: Request):
     username = data.get("username")
     level_id = int(data.get("level_id"))
     time_ms = float(data.get("time_ms"))
+    is_daily = data.get("is_daily", False)
 
     if username not in USERS_DB:
         raise HTTPException(status_code=404, detail="User not found")
 
     user = USERS_DB[username]
-    first_time = level_id not in user["completed_levels"]
     earned_coins = 0
 
+    if is_daily:
+        DAILY_LEADERBOARD.append({"driver": username, "timeMs": time_ms, "date": str(datetime.date.today())})
+        DAILY_LEADERBOARD.sort(key=lambda x: x["timeMs"])
+        rank = next((i + 1 for i, entry in enumerate(DAILY_LEADERBOARD) if entry["driver"] == username), 0)
+        world_record = DAILY_LEADERBOARD[0]["timeMs"] if DAILY_LEADERBOARD else time_ms
+        return {"status": "success", "earned_coins": 0, "total_coins": user["coins"], "rank": rank, "world_record": world_record}
+
+    first_time = level_id not in user["completed_levels"]
     if first_time:
         user["completed_levels"].append(level_id)
         earned_coins = 10
@@ -117,6 +125,17 @@ async def update_color(request: Request):
         USERS_DB[username]["color"] = color
     return {"status": "success"}
 
+@app.post("/api/settings/controls")
+async def update_controls(request: Request):
+    data = await request.json()
+    username = data.get("username")
+    pos = data.get("pos")
+    if username in USERS_DB:
+        USERS_DB[username]["control_pos"] = pos
+    return {"status": "success"}
+
 @app.get("/api/leaderboard/level/{level_id}")
 def get_level_lb(level_id: int):
+    if level_id == 9999:
+        return DAILY_LEADERBOARD[:10]
     return LEVEL_LEADERBOARDS.get(level_id, [])[:10]
