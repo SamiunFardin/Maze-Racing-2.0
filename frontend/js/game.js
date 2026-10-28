@@ -101,10 +101,10 @@ const car = {
   y: 0,
   angle: 0,
   speed: 0,
-  maxSpeed: 4.0,
-  accel: 0.030,
-  brake: 0.040,
-  friction: 0.900,
+  maxSpeed: 5.0,
+  accel: 0.03,
+  brake: 0.04,
+  friction: 0.975,
   turnSpeed: 0.025,
   width: 28,
   height: 48,
@@ -181,7 +181,19 @@ function setupControls() {
   });
 }
 
-// 17. PRE-RACE 3-SECOND COUNTDOWN SEQUENCE
+// TIPS POOL FOR LOADING & COUNTDOWN SCREENS
+const GAME_TIPS = [
+  "Upgrade your car from the garage for better performance and higher top speeds!",
+  "Brake early before entering tight maze corners to avoid punishing wall recoils.",
+  "Larger multiplayer grids award massive exponential coin payouts for 1st place!",
+  "Keep your momentum up on long straightaways by fine-tuning your friction slider.",
+  "Daily challenges reset every 24 hours with a brand new procedural track for everyone."
+];
+
+function getRandomTip() {
+  return GAME_TIPS[Math.floor(Math.random() * GAME_TIPS.length)];
+}
+
 function prepareAndStartLevel(mazeConfig) {
   currentMaze = getOrGenerateMaze(mazeConfig);
   document.getElementById('hud-level-title').innerText = `${currentMaze.name} (${currentMaze.sizeLabel})`;
@@ -198,6 +210,9 @@ function prepareAndStartLevel(mazeConfig) {
 
   const countdownModal = document.getElementById('modal-countdown');
   const numElem = document.getElementById('countdown-number');
+  const tipElem = document.getElementById('countdown-tip-text');
+  
+  tipElem.innerText = getRandomTip();
   countdownModal.classList.remove('hidden');
 
   let count = 3;
@@ -297,7 +312,6 @@ function updatePhysics() {
   }
 }
 
-// 3. ENHANCED ORIGINAL CAR & WORLD RENDERING
 function renderWorld() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const screenCenterX = canvas.width / 2;
@@ -347,7 +361,6 @@ function renderWorld() {
 
   ctx.restore();
 
-  // Render Detailed Player Car with Shadow, Windshield, Headlights
   ctx.save();
   ctx.translate(screenCenterX, screenCenterY);
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -372,7 +385,6 @@ function renderWorld() {
   if (gameActive && !isPaused) renderMiniMap();
 }
 
-// 2. FIXED MINIMAP RENDERER
 function renderMiniMap() {
   const mapSize = 105;
   const x = canvas.width - mapSize - 12;
