@@ -13,11 +13,11 @@ socket_app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)
 rooms = {}
 GRID_MULTIPLIERS = {25: 1, 50: 4, 75: 9, 100: 16, 150: 36, 200: 64}
 
-async def room_timeout_task(room_id):
+async def room_countdown_and_start(room_id):
     await asyncio.sleep(20)
     if room_id in rooms and rooms[room_id]["status"] == "waiting":
-        rooms[room_id]["status"] = "countdown"
-        await sio.emit("start_countdown", {"seconds": 5}, room=room_id)
+        rooms[room_id]["status"] = "racing"
+        await sio.emit("start_multiplayer_race", {"room_id": room_id}, room=room_id)
 
 @sio.event
 async def connect(sid, environ):
@@ -30,7 +30,7 @@ async def join_multiplayer(sid, data):
 
     if username in USERS_DB:
         if USERS_DB[username]["coins"] < 1:
-            await sio.emit("error_message", {"detail": "Entry fee requires 1 coin!"}, room=sid)
+            await sio.emit("error_message", {"detail": "Multiplayer entry requires 1 coin!"}, room=sid)
             return
         USERS_DB[username]["coins"] -= 1
 
@@ -49,7 +49,7 @@ async def join_multiplayer(sid, data):
             "finishing_order": [],
             "status": "waiting"
         }
-        asyncio.create_task(room_timeout_task(target_room))
+        asyncio.create_task(room_countdown_and_start(target_room))
 
     rooms[target_room]["players"][sid] = {
         "username": username,
@@ -58,11 +58,17 @@ async def join_multiplayer(sid, data):
     }
 
     sio.enter_room(sid, target_room)
-    await sio.emit("room_update", rooms[target_room], room=target_room)
+    
+    player_list = [p["username"] for p in rooms[target_room]["players"].values()]
+    await sio.emit("waiting_room_update", {
+        "room_id": target_room,
+        "players": player_list,
+        "count": len(player_list)
+    }, room=target_room)
 
     if len(rooms[target_room]["players"]) == 20 and rooms[target_room]["status"] == "waiting":
-        rooms[target_room]["status"] = "countdown"
-        await sio.emit("start_countdown", {"seconds": 5}, room=target_room)
+        rooms[target_room]["status"] = "racing"
+        await sio.emit("start_multiplayer_race", {"room_id": target_room}, room=target_room)
 
 @sio.event
 async def player_finished(sid, data):
@@ -72,11 +78,9 @@ async def player_finished(sid, data):
         if sid not in room["finishing_order"]:
             room["finishing_order"].append(sid)
             rank = len(room["finishing_order"])
-            total_players = len(room["players"])
+            total = len(room["players"])
             multiplier = GRID_MULTIPLIERS.get(room["grid_size"], 1)
-
-            # Payout = (Total Players - Rank + 1) * Multiplier
-            payout = (total_players - rank + 1) * multiplier
+            payout = (total - rank + 1) * multiplier
 
             username = room["players"][sid]["username"]
             if username in USERS_DB:
@@ -103,7 +107,8 @@ async def disconnect(sid):
     for r_id, room in list(rooms.items()):
         if sid in room["players"]:
             del room["players"][sid]
-            await sio.emit("room_update", room, room=r_id)
+            player_list = [p["username"] for p in room["players"].values()]
+            await sio.emit("waiting_room_update", {"room_id": r_id, "players": player_list, "count": len(player_list)}, room=r_id)
             if not room["players"]:
                 del rooms[r_id]
             break
