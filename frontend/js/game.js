@@ -7,7 +7,6 @@ function LCG(seed) {
   };
 }
 
-// --- COMPLEX DFS MAZE GENERATOR ---
 function generateDFSComplexMaze(cols, rows, seed) {
   const rng = LCG(seed);
   const gridCols = cols % 2 === 0 ? cols + 1 : cols;
@@ -64,14 +63,13 @@ function generateDFSComplexMaze(cols, rows, seed) {
   };
 }
 
-// GENERATE ALL 100 CAMPAIGN LEVEL CONFIGURATIONS
 const SIZE_CATEGORIES = [
-  { key: 25, label: "25x25 (Levels 1-20)" },
-  { key: 50, label: "50x50 (Levels 21-40)" },
-  { key: 75, label: "75x75 (Levels 41-60)" },
-  { key: 100, label: "100x100 (Levels 61-80)" },
-  { key: 150, label: "150x150 (Levels 81-90)" },
-  { key: 200, label: "200x200 (Levels 91-100)" }
+  { key: 25, label: "25x25 (1-20)" },
+  { key: 50, label: "50x50 (21-40)" },
+  { key: 75, label: "75x75 (41-60)" },
+  { key: 100, label: "100x100 (61-80)" },
+  { key: 150, label: "150x150 (81-90)" },
+  { key: 200, label: "200x200 (91-100)" }
 ];
 
 const CAMPAIGN_100_LEVELS = [];
@@ -83,12 +81,7 @@ for (let i = 1; i <= 100; i++) {
   else if (i > 80 && i <= 90) size = 150;
   else if (i > 90) size = 200;
 
-  CAMPAIGN_100_LEVELS.push({
-    id: i,
-    name: `Level ${i}`,
-    size: size,
-    seed: 1000 + i * 37
-  });
+  CAMPAIGN_100_LEVELS.push({ id: i, name: `Level ${i}`, size: size, seed: 1000 + i * 37 });
 }
 
 const generatedMazesCache = {};
@@ -108,11 +101,11 @@ const car = {
   y: 0,
   angle: 0,
   speed: 0,
-  maxSpeed: 6.5,
-  accel: 0.050,
-  brake: 0.065,
-  friction: 0.990,
-  turnSpeed: 0.040,
+  maxSpeed: 4.0,
+  accel: 0.030,
+  brake: 0.040,
+  friction: 0.900,
+  turnSpeed: 0.025,
   width: 28,
   height: 48,
   color: '#3b82f6',
@@ -121,7 +114,6 @@ const car = {
 
 let multiplayerGhosts = {};
 let carTrailPath = [];
-
 const inputs = { gas: false, brake: false, steerLeft: false, steerRight: false };
 
 let gameActive = false;
@@ -136,7 +128,6 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const fullMapCanvas = document.getElementById('fullMapCanvas');
 const fullMapCtx = fullMapCanvas.getContext('2d');
-
 const TILE_SIZE = 70;
 
 window.addEventListener('load', () => {
@@ -147,8 +138,10 @@ window.addEventListener('load', () => {
 
 function resizeCanvas() {
   const container = document.getElementById('canvas-container');
-  canvas.width = container.clientWidth;
-  canvas.height = container.clientHeight;
+  if (container) {
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+  }
 }
 
 function setupControls() {
@@ -188,7 +181,8 @@ function setupControls() {
   });
 }
 
-function startLevel(mazeConfig) {
+// 17. PRE-RACE 3-SECOND COUNTDOWN SEQUENCE
+function prepareAndStartLevel(mazeConfig) {
   currentMaze = getOrGenerateMaze(mazeConfig);
   document.getElementById('hud-level-title').innerText = `${currentMaze.name} (${currentMaze.sizeLabel})`;
 
@@ -202,11 +196,36 @@ function startLevel(mazeConfig) {
 
   document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
 
+  const countdownModal = document.getElementById('modal-countdown');
+  const numElem = document.getElementById('countdown-number');
+  countdownModal.classList.remove('hidden');
+
+  let count = 3;
+  numElem.innerText = count;
+  audioEngine.playBeep(440, 0.2);
+
+  const timer = setInterval(() => {
+    count--;
+    if (count > 0) {
+      numElem.innerText = count;
+      audioEngine.playBeep(440, 0.2);
+    } else if (count === 0) {
+      numElem.innerText = "GO!";
+      audioEngine.playBeep(880, 0.4);
+    } else {
+      clearInterval(timer);
+      countdownModal.classList.add('hidden');
+      startGameLoop();
+    }
+  }, 1000);
+}
+
+function startGameLoop() {
+  document.getElementById('game-hud').classList.remove('hidden');
   gameActive = true;
   isPaused = false;
   startTime = performance.now();
   pausedTimeTotal = 0;
-
   if (animFrameId) cancelAnimationFrame(animFrameId);
   gameLoop();
 }
@@ -247,7 +266,7 @@ function updatePhysics() {
   if (!checkCollision(nextX + (vx > 0 ? collisionRadius : -collisionRadius), car.y)) {
     car.x = nextX;
   } else {
-    if (Math.abs(car.speed) > 1.5) audioEngine.playRecoilImpact();
+    if (Math.abs(car.speed) > 1.0) audioEngine.playRecoilImpact();
     car.speed = -car.speed * 0.4;
     collided = true;
   }
@@ -255,7 +274,7 @@ function updatePhysics() {
   if (!checkCollision(car.x, nextY + (vy > 0 ? collisionRadius : -collisionRadius))) {
     car.y = nextY;
   } else {
-    if (Math.abs(car.speed) > 1.5) audioEngine.playRecoilImpact();
+    if (Math.abs(car.speed) > 1.0) audioEngine.playRecoilImpact();
     car.speed = -car.speed * 0.4;
     collided = true;
   }
@@ -263,12 +282,7 @@ function updatePhysics() {
   car.isColliding = collided;
 
   if (typeof socket !== 'undefined' && socket.connected && window.currentRoomId) {
-    socket.emit('player_move', {
-      room_id: window.currentRoomId,
-      x: car.x,
-      y: car.y,
-      angle: car.angle
-    });
+    socket.emit('player_move', { room_id: window.currentRoomId, x: car.x, y: car.y, angle: car.angle });
   }
 
   const lastPoint = carTrailPath[carTrailPath.length - 1];
@@ -283,9 +297,9 @@ function updatePhysics() {
   }
 }
 
+// 3. ENHANCED ORIGINAL CAR & WORLD RENDERING
 function renderWorld() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   const screenCenterX = canvas.width / 2;
   const screenCenterY = canvas.height / 2;
 
@@ -333,8 +347,12 @@ function renderWorld() {
 
   ctx.restore();
 
+  // Render Detailed Player Car with Shadow, Windshield, Headlights
   ctx.save();
   ctx.translate(screenCenterX, screenCenterY);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(-car.width / 2 + 4, -car.height / 2 + 4, car.width, car.height);
+
   ctx.fillStyle = car.isColliding ? '#dc2626' : car.color;
   ctx.beginPath();
   ctx.roundRect(-car.width / 2, -car.height / 2, car.width, car.height, 8);
@@ -342,11 +360,19 @@ function renderWorld() {
   ctx.strokeStyle = car.isColliding ? '#f87171' : '#38bdf8';
   ctx.lineWidth = 3;
   ctx.stroke();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(-car.width / 2 + 4, -car.height / 2 + 10, car.width - 8, 16);
+
+  ctx.fillStyle = car.isColliding ? '#ef4444' : '#fef08a';
+  ctx.fillRect(-car.width / 2 + 3, -car.height / 2 + 2, 6, 4);
+  ctx.fillRect(car.width / 2 - 9, -car.height / 2 + 2, 6, 4);
   ctx.restore();
 
   if (gameActive && !isPaused) renderMiniMap();
 }
 
+// 2. FIXED MINIMAP RENDERER
 function renderMiniMap() {
   const mapSize = 105;
   const x = canvas.width - mapSize - 12;
@@ -360,9 +386,17 @@ function renderMiniMap() {
   const scaleX = mapSize / (currentMaze.cols * TILE_SIZE);
   const scaleY = mapSize / (currentMaze.rows * TILE_SIZE);
 
+  for (let r = 0; r < currentMaze.rows; r++) {
+    for (let c = 0; c < currentMaze.cols; c++) {
+      if (currentMaze.grid[r][c] === 1) {
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(x + c * TILE_SIZE * scaleX, y + r * TILE_SIZE * scaleY, Math.max(1, TILE_SIZE * scaleX), Math.max(1, TILE_SIZE * scaleY));
+      }
+    }
+  }
+
   const carMinimapX = x + car.x * scaleX;
   const carMinimapY = y + car.y * scaleY;
-
   ctx.save();
   ctx.translate(carMinimapX, carMinimapY);
   ctx.rotate(car.angle);
@@ -371,15 +405,34 @@ function renderMiniMap() {
   ctx.restore();
 }
 
+function renderFullMazeMap() {
+  const containerW = fullMapCanvas.parentElement.clientWidth - 20;
+  const containerH = fullMapCanvas.parentElement.clientHeight - 20;
+  fullMapCanvas.width = containerW;
+  fullMapCanvas.height = containerH;
+  fullMapCtx.clearRect(0, 0, containerW, containerH);
+
+  const tileSize = Math.min(containerW / currentMaze.cols, containerH / currentMaze.rows);
+  const mapWidth = tileSize * currentMaze.cols;
+  const mapHeight = tileSize * currentMaze.rows;
+  const offsetX = (containerW - mapWidth) / 2;
+  const offsetY = (containerH - mapHeight) / 2;
+
+  for (let r = 0; r < currentMaze.rows; r++) {
+    for (let c = 0; c < currentMaze.cols; c++) {
+      fullMapCtx.fillStyle = currentMaze.grid[r][c] === 1 ? '#3b82f6' : '#0f172a';
+      fullMapCtx.fillRect(offsetX + c * tileSize, offsetY + r * tileSize, tileSize, tileSize);
+    }
+  }
+}
+
 function triggerVictory() {
   gameActive = false;
   audioEngine.playVictoryFanfare();
   document.getElementById('victory-final-time').innerText = formatTime(elapsedTime);
   document.getElementById('modal-victory').classList.remove('hidden');
 
-  if (currentMaze.isDaily) {
-    handleDailySubmission(elapsedTime);
-  } else {
+  if (!currentMaze.isDaily) {
     handleCampaignVictory(currentMaze.id, elapsedTime);
   }
 }
