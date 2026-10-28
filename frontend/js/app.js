@@ -3,12 +3,17 @@ let userCoins = 100;
 let completedLevels = [];
 let userStats = {};
 let currentAuthMode = 'login';
+let isNewRegistration = false;
 
 const backendUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : window.location.origin;
 const socket = io(backendUrl);
 
-// 15, 19. SPLASH SCREEN & LOCAL STORAGE AUTO-RESTORE
 window.addEventListener('load', () => {
+  const splashTip = document.getElementById('splash-tip-text');
+  if (splashTip) {
+    splashTip.innerText = GAME_TIPS[Math.floor(Math.random() * GAME_TIPS.length)];
+  }
+
   setTimeout(() => {
     const splash = document.getElementById('splash-screen');
     if (splash) {
@@ -21,30 +26,30 @@ window.addEventListener('load', () => {
     if (savedUser && savedPass) {
       document.getElementById('auth-username').value = savedUser;
       document.getElementById('auth-password').value = savedPass;
-      submitAuth();
+      submitAuth(true);
     } else {
       document.getElementById('modal-auth').classList.remove('hidden');
     }
   }, 2000);
 });
 
-// 9. SWITCH LOGIN / SIGNUP TABS
 function switchAuthTab(mode) {
   currentAuthMode = mode;
   const isSignup = mode === 'signup';
+  isNewRegistration = isSignup;
   document.getElementById('tab-login').className = isSignup ? 'py-2 rounded-lg text-xs font-bold text-slate-400' : 'py-2 rounded-lg text-xs font-bold bg-blue-600 text-white';
   document.getElementById('tab-signup').className = isSignup ? 'py-2 rounded-lg text-xs font-bold bg-blue-600 text-white' : 'py-2 rounded-lg text-xs font-bold text-slate-400';
   document.getElementById('auth-btn-submit').innerText = isSignup ? 'SIGN UP & PLAY' : 'LOGIN';
   document.getElementById('auth-color-section').classList.toggle('hidden', !isSignup);
 }
 
-function submitAuth() {
+function submitAuth(isAuto = false) {
   const username = document.getElementById('auth-username').value.trim();
   const password = document.getElementById('auth-password').value;
   const color = document.getElementById('auth-color-picker').value || '#3b82f6';
 
   if (!username || !password) {
-    alert("Please enter both username and password.");
+    if (!isAuto) alert("Please enter both username and password.");
     return;
   }
 
@@ -62,6 +67,10 @@ function submitAuth() {
       userStats = response.body.user_data.stats;
       car.color = response.body.user_data.color;
 
+      if (response.body.user_data.control_pos) {
+        applyControlPosition(response.body.user_data.control_pos);
+      }
+
       localStorage.setItem('tm_logged_username', currentUser);
       localStorage.setItem('tm_logged_password', password);
 
@@ -70,9 +79,18 @@ function submitAuth() {
 
       document.getElementById('menu-player-name').innerText = currentUser;
       document.getElementById('modal-auth').classList.add('hidden');
-      document.getElementById('modal-menu').classList.remove('hidden');
+
+      if (isNewRegistration && !isAuto) {
+        isNewRegistration = false;
+        document.getElementById('modal-adjust-prompt').classList.remove('hidden');
+      } else {
+        document.getElementById('modal-menu').classList.remove('hidden');
+      }
     } else {
-      alert(response.body.detail);
+      if (!isAuto) alert(response.body.detail);
+      localStorage.removeItem('tm_logged_username');
+      localStorage.removeItem('tm_logged_password');
+      document.getElementById('modal-auth').classList.remove('hidden');
     }
   });
 }
@@ -90,7 +108,6 @@ function updateHUDCoins() {
   document.getElementById('menu-coins-val').innerText = userCoins;
 }
 
-// 6. GARAGE WITH DETAILED DESCRIPTIVE NOTES
 const STAT_NOTES = {
   topSpeed: "Increases max velocity. Higher = faster top speed, requires precise braking.",
   acceleration: "Increases velocity gain rate off the line.",
@@ -165,20 +182,85 @@ function tuneCurrentStat(stat_name, value) {
   });
 }
 
-// 8. MULTIPLAYER QUEUE WITH WAITING ROOM
-function joinMultiplayerQueue() {
+// CONTROL REPOSITIONING FLOW
+function skipControlAdjustment() {
+  document.getElementById('modal-adjust-prompt').classList.add('hidden');
+  document.getElementById('modal-menu').classList.remove('hidden');
+}
+
+function startControlAdjustment() {
+  document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
+  document.getElementById('edit-layout-banner').classList.remove('hidden');
+}
+
+document.getElementById('btn-save-controls').onclick = () => {
+  document.getElementById('edit-layout-banner').classList.add('hidden');
+  const leftW = document.getElementById('ctrl-buttons-wrapper');
+  const pos = { left: parseInt(leftW.style.left) || 24, bottom: parseInt(leftW.style.bottom) || 24 };
+  
+  fetch(`${backendUrl}/api/settings/controls`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: currentUser, pos })
+  });
+  document.getElementById('modal-menu').classList.remove('hidden');
+};
+
+document.getElementById('btn-reset-controls').onclick = () => {
+  const leftW = document.getElementById('ctrl-buttons-wrapper');
+  const rightW = document.getElementById('ctrl-pedals-wrapper');
+  leftW.style.left = '24px'; leftW.style.bottom = '24px'; leftW.style.top = 'auto';
+  rightW.style.right = '24px'; rightW.style.bottom = '20px'; rightW.style.top = 'auto';
+};
+
+function applyControlPosition(pos) {
+  const leftW = document.getElementById('ctrl-buttons-wrapper');
+  if (pos && pos.left) {
+    leftW.style.left = `${pos.left}px`;
+    leftW.style.bottom = `${pos.bottom}px`;
+    leftW.style.top = 'auto';
+  }
+}
+
+// MULTIPLAYER SIZE SELECTION & WAITING ROOM
+function openMultiplayerSizeModal() {
+  document.getElementById('modal-menu').classList.add('hidden');
+  document.getElementById('modal-mp-size').classList.remove('hidden');
+}
+
+function joinMultiplayerWithGrid(gridSize) {
   if (userCoins < 1) {
     alert("Insufficient coins! Multiplayer entry requires 1 coin.");
     return;
   }
-  document.getElementById('modal-menu').classList.add('hidden');
+  document.getElementById('modal-mp-size').classList.add('hidden');
   document.getElementById('modal-waiting-room').classList.remove('hidden');
-  socket.emit('join_multiplayer', { username: currentUser, grid_size: 25, color: car.color });
+  socket.emit('join_multiplayer', { username: currentUser, grid_size: gridSize, color: car.color });
 }
 
 function cancelMultiplayerQueue() {
   document.getElementById('modal-waiting-room').classList.add('hidden');
   document.getElementById('modal-menu').classList.remove('hidden');
+}
+
+// DAILY CHALLENGE HANDLERS
+function openDailyChallengeMenu() {
+  document.getElementById('modal-menu').classList.add('hidden');
+  document.getElementById('modal-daily-menu').classList.remove('hidden');
+}
+
+function startDailyChallenge() {
+  const d = new Date();
+  const dateSeed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  const dailyConfig = { id: 9999, name: "Daily Challenge Arena", size: 50, seed: dateSeed, isDaily: true };
+  prepareAndStartLevel(dailyConfig);
+}
+
+function openDailyLeaderboard() {
+  document.getElementById('modal-daily-menu').classList.add('hidden');
+  openLeaderboardsModal();
+  document.getElementById('lb-level-select').value = "9999";
+  fetchLeaderboard(9999);
 }
 
 socket.on('waiting_room_update', (data) => {
@@ -189,44 +271,43 @@ socket.on('waiting_room_update', (data) => {
 
 socket.on('start_multiplayer_race', (data) => {
   document.getElementById('modal-waiting-room').classList.add('hidden');
-  const dailyConfig = { id: 8888, name: "Multiplayer Arena", size: 25, seed: Math.floor(Math.random()*10000) };
-  prepareAndStartLevel(dailyConfig);
+  const mpConfig = { id: 8888, name: "Multiplayer Arena", size: 25, seed: Math.floor(Math.random()*10000) };
+  prepareAndStartLevel(mpConfig);
 });
 
-function handleCampaignVictory(level_id, time_ms) {
+function handleCampaignVictory(level_id, time_ms, is_daily = false) {
   fetch(`${backendUrl}/api/campaign/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: currentUser, level_id, time_ms })
+    body: JSON.stringify({ username: currentUser, level_id, time_ms, is_daily })
   })
   .then(res => res.json())
   .then(data => {
     if (data.status === 'success') {
       userCoins = data.total_coins;
-      completedLevels = data.completed_levels;
       updateHUDCoins();
-      document.getElementById('victory-coin-payout').innerText = data.first_time ? "+10 Coins (First Clear!)" : "+0 Coins (Already Cleared)";
+      document.getElementById('victory-coin-payout').innerText = is_daily ? "Daily Challenge Completed!" : (data.first_time ? "+10 Coins (First Clear!)" : "+0 Coins (Already Cleared)");
       document.getElementById('victory-rank-display').innerText = `Rank #${data.rank} | World Record: ${formatTime(data.world_record)}`;
     }
   });
 }
 
-// 1, 12, 13. UI & MODAL EVENT BINDINGS
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
 function openLevelsModal() {
   openModal('modal-levels');
-  renderCategoryTabs();
   renderLevelSelector();
 }
 
 function openGarageModal() {
+  document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
   openModal('modal-garage');
   renderGarageUI();
 }
 
 function openSettingsModal() {
+  document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
   openModal('modal-settings');
 }
 
@@ -241,8 +322,12 @@ function openProfileModal() {
 function openLeaderboardsModal() {
   openModal('modal-leaderboards');
   const sel = document.getElementById('lb-level-select');
-  sel.innerHTML = CAMPAIGN_100_LEVELS.map(m => `<option value="${m.id}">${m.name} (${m.size}x${m.size})</option>`).join('');
-  fetchLeaderboard(1);
+  sel.innerHTML = `<option value="9999">🌟 Daily Challenge Arena</option>` + CAMPAIGN_100_LEVELS.map(m => `<option value="${m.id}">${m.name} (${m.size}x${m.size})</option>`).join('');
+  fetchLeaderboard(9999);
+}
+
+function openRewardTiersModal() {
+  openModal('modal-reward-tiers');
 }
 
 function fetchLeaderboard(level_id) {
@@ -263,23 +348,10 @@ function fetchLeaderboard(level_id) {
     });
 }
 
-function renderCategoryTabs() {
-  const container = document.getElementById('category-tabs');
-  container.innerHTML = SIZE_CATEGORIES.map(cat => `
-    <button class="px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${selectedCategoryFilter === cat.key ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}" onclick="filterCategory(${cat.key})">${cat.label}</button>
-  `).join('');
-}
-
-window.filterCategory = function(size) {
-  selectedCategoryFilter = size;
-  renderCategoryTabs();
-  renderLevelSelector();
-};
-
 function renderLevelSelector() {
   const container = document.getElementById('levels-container');
   container.innerHTML = '';
-  CAMPAIGN_100_LEVELS.filter(m => m.size === selectedCategoryFilter).forEach(cfg => {
+  CAMPAIGN_100_LEVELS.forEach(cfg => {
     const isUnlocked = cfg.id === 1 || completedLevels.includes(cfg.id - 1);
     const isCleared = completedLevels.includes(cfg.id);
 
@@ -314,13 +386,13 @@ function updateCarColor(color) {
   });
 }
 
-// HUD Button Wiring
 document.getElementById('btn-back-menu').onclick = () => {
   gameActive = false;
   document.getElementById('game-hud').classList.add('hidden');
   document.getElementById('modal-menu').classList.remove('hidden');
 };
 document.getElementById('btn-pause-game').onclick = () => togglePause();
+document.getElementById('btn-edit-controls-hud').onclick = () => startControlAdjustment();
 document.getElementById('btn-full-map').onclick = () => {
   openModal('modal-full-map');
   renderFullMazeMap();
