@@ -1,4 +1,3 @@
-// --- SEEDED LCG PSEUDO-RANDOM GENERATOR ---
 function LCG(seed) {
   let s = seed;
   return function() {
@@ -63,15 +62,6 @@ function generateDFSComplexMaze(cols, rows, seed) {
   };
 }
 
-const SIZE_CATEGORIES = [
-  { key: 25, label: "25x25 (1-20)" },
-  { key: 50, label: "50x50 (21-40)" },
-  { key: 75, label: "75x75 (41-60)" },
-  { key: 100, label: "100x100 (61-80)" },
-  { key: 150, label: "150x150 (81-90)" },
-  { key: 200, label: "200x200 (91-100)" }
-];
-
 const CAMPAIGN_100_LEVELS = [];
 for (let i = 1; i <= 100; i++) {
   let size = 25;
@@ -94,7 +84,6 @@ function getOrGenerateMaze(cfg) {
 }
 
 let currentMaze = null;
-let selectedCategoryFilter = 25;
 
 const car = {
   x: 0,
@@ -120,7 +109,6 @@ let gameActive = false;
 let isPaused = false;
 let startTime = 0;
 let pausedTimeTotal = 0;
-let pauseStartedAt = 0;
 let elapsedTime = 0;
 let animFrameId = null;
 
@@ -134,6 +122,7 @@ window.addEventListener('load', () => {
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
   setupControls();
+  setupControlDragging();
 });
 
 function resizeCanvas() {
@@ -181,7 +170,46 @@ function setupControls() {
   });
 }
 
-// TIPS POOL FOR LOADING & COUNTDOWN SCREENS
+function setupControlDragging() {
+  const leftWrapper = document.getElementById('ctrl-buttons-wrapper');
+  const rightWrapper = document.getElementById('ctrl-pedals-wrapper');
+
+  let activeDrag = null;
+  let startX = 0, startY = 0;
+
+  const onDragStart = (e, el) => {
+    if (!document.getElementById('edit-layout-banner').classList.contains('hidden')) {
+      activeDrag = el;
+      const touch = e.touches ? e.touches[0] : e;
+      startX = touch.clientX - el.offsetLeft;
+      startY = touch.clientY - el.offsetTop;
+      e.preventDefault();
+    }
+  };
+
+  const onDragMove = (e) => {
+    if (!activeDrag) return;
+    const touch = e.touches ? e.touches[0] : e;
+    const x = touch.clientX - startX;
+    const y = touch.clientY - startY;
+    activeDrag.style.left = `${Math.max(10, Math.min(window.innerWidth - activeDrag.offsetWidth - 10, x))}px`;
+    activeDrag.style.bottom = 'auto';
+    activeDrag.style.top = `${Math.max(10, Math.min(window.innerHeight - activeDrag.offsetHeight - 10, y))}px`;
+  };
+
+  const onDragEnd = () => { activeDrag = null; };
+
+  leftWrapper.addEventListener('mousedown', (e) => onDragStart(e, leftWrapper));
+  leftWrapper.addEventListener('touchstart', (e) => onDragStart(e, leftWrapper));
+  rightWrapper.addEventListener('mousedown', (e) => onDragStart(e, rightWrapper));
+  rightWrapper.addEventListener('touchstart', (e) => onDragStart(e, rightWrapper));
+
+  window.addEventListener('mousemove', onDragMove);
+  window.addEventListener('touchmove', onDragMove);
+  window.addEventListener('mouseup', onDragEnd);
+  window.addEventListener('touchend', onDragEnd);
+}
+
 const GAME_TIPS = [
   "Upgrade your car from the garage for better performance and higher top speeds!",
   "Brake early before entering tight maze corners to avoid punishing wall recoils.",
@@ -407,13 +435,25 @@ function renderMiniMap() {
     }
   }
 
+  // Draw trail on minimap
+  if (carTrailPath.length > 1) {
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + carTrailPath[0].x * scaleX, y + carTrailPath[0].y * scaleY);
+    for (let i = 1; i < carTrailPath.length; i++) {
+      ctx.lineTo(x + carTrailPath[i].x * scaleX, y + carTrailPath[i].y * scaleY);
+    }
+    ctx.stroke();
+  }
+
   const carMinimapX = x + car.x * scaleX;
   const carMinimapY = y + car.y * scaleY;
   ctx.save();
   ctx.translate(carMinimapX, carMinimapY);
   ctx.rotate(car.angle);
   ctx.fillStyle = '#ef4444';
-  ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(4, 4); ctx.lineTo(-4, 4); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(3, 3); ctx.lineTo(-3, 3); ctx.fill();
   ctx.restore();
 }
 
@@ -444,9 +484,7 @@ function triggerVictory() {
   document.getElementById('victory-final-time').innerText = formatTime(elapsedTime);
   document.getElementById('modal-victory').classList.remove('hidden');
 
-  if (!currentMaze.isDaily) {
-    handleCampaignVictory(currentMaze.id, elapsedTime);
-  }
+  handleCampaignVictory(currentMaze.id, elapsedTime, currentMaze.isDaily);
 }
 
 function gameLoop() {
