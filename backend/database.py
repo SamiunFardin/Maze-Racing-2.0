@@ -1,8 +1,8 @@
-# Master Database & Updated 7-Stat Initial/Max Tuning Configuration
 import datetime
 
 USERS_DB = {}
 LEVEL_LEADERBOARDS = {i: [] for i in range(1, 101)}
+DAILY_LEADERBOARD = []
 
 def get_or_create_user(username, password, color="#3b82f6"):
     if username not in USERS_DB:
@@ -20,6 +20,7 @@ def get_or_create_user(username, password, color="#3b82f6"):
                 "reverse": {"unlocked": 1.0, "current": 1.0, "min": 0.5, "max": 20.0, "step": 0.01},
                 "friction": {"unlocked": 0.975, "current": 0.975, "min": 0.850, "max": 0.999, "step": 0.01}
             },
+            "control_pos": {"bottom": 24, "left": 24},
             "bgm_volume": 0.8,
             "sfx_volume": 1.0,
             "bgm_enabled": True,
