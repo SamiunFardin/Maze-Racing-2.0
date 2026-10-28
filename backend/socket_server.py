@@ -16,7 +16,16 @@ GRID_MULTIPLIERS = {25: 1, 50: 4, 75: 9, 100: 16, 150: 36, 200: 64}
 async def room_countdown_and_start(room_id):
     await asyncio.sleep(20)
     if room_id in rooms and rooms[room_id]["status"] == "waiting":
-        rooms[room_id]["status"] = "racing"
+        room = rooms[room_id]
+        room["status"] = "racing"
+        for sid in room["players"]:
+            username = room["players"][sid]["username"]
+            if username in USERS_DB:
+                if USERS_DB[username]["coins"] >= 1:
+                    USERS_DB[username]["coins"] -= 1
+                    room["players"][sid]["deducted"] = True
+                else:
+                    room["players"][sid]["deducted"] = False
         await sio.emit("start_multiplayer_race", {"room_id": room_id}, room=room_id)
 
 @sio.event
@@ -32,7 +41,6 @@ async def join_multiplayer(sid, data):
         if USERS_DB[username]["coins"] < 1:
             await sio.emit("error_message", {"detail": "Multiplayer entry requires 1 coin!"}, room=sid)
             return
-        USERS_DB[username]["coins"] -= 1
 
     target_room = None
     for r_id, room in rooms.items():
@@ -54,7 +62,8 @@ async def join_multiplayer(sid, data):
     rooms[target_room]["players"][sid] = {
         "username": username,
         "color": data.get("color", "#3b82f6"),
-        "x": 0, "y": 0, "angle": 0
+        "x": 0, "y": 0, "angle": 0,
+        "deducted": False
     }
 
     sio.enter_room(sid, target_room)
@@ -68,6 +77,10 @@ async def join_multiplayer(sid, data):
 
     if len(rooms[target_room]["players"]) == 20 and rooms[target_room]["status"] == "waiting":
         rooms[target_room]["status"] = "racing"
+        for s in rooms[target_room]["players"]:
+            uname = rooms[target_room]["players"][s]["username"]
+            if uname in USERS_DB and USERS_DB[uname]["coins"] >= 1:
+                USERS_DB[uname]["coins"] -= 1
         await sio.emit("start_multiplayer_race", {"room_id": target_room}, room=target_room)
 
 @sio.event
