@@ -3,20 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Turbo Maze Racer - Complete Master Edition</title>
+  <title>Turbo Maze Racer - Ultimate Edition</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="bg-slate-950 text-white flex flex-col h-screen w-screen overflow-hidden">
 
-  <!-- 15. SPLASH LOADING SCREEN (2 SECONDS) -->
-  <div id="splash-screen" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center space-y-4 transition-opacity duration-700">
+  <!-- SPLASH SCREEN WITH TAGLINE & TIPS -->
+  <div id="splash-screen" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center space-y-4 px-6 text-center transition-opacity duration-700">
     <div class="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-500/50 animate-bounce">
       <i class="fa-solid fa-car-side text-4xl text-white"></i>
     </div>
     <h1 class="text-3xl font-black italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">TURBO MAZE RACER</h1>
-    <div class="w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+    <p class="text-xs text-slate-400 max-w-xs">Conquer Intricate Mazes. Outrun Ghosts. Rule the Global Leaderboards.</p>
+    
+    <div class="bg-slate-900/80 border border-slate-800 p-3 rounded-xl max-w-sm w-full mt-4">
+      <div class="text-[10px] text-amber-400 font-bold uppercase mb-0.5"><i class="fa-solid fa-lightbulb mr-1"></i> Pro Tip</div>
+      <div id="splash-tip-text" class="text-xs text-slate-300">Upgrade your car from the garage for better performance and higher top speeds!</div>
+    </div>
+
+    <div class="w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-2">
       <div id="splash-bar" class="w-full h-full bg-blue-500 animate-pulse"></div>
     </div>
   </div>
@@ -42,7 +49,7 @@
         <i class="fa-solid fa-pause"></i><span>Pause</span>
       </button>
       <button id="btn-edit-controls-hud" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold shadow-md flex items-center space-x-1">
-        <i class="fa-solid fa-up-down-left-right"></i><span class="hidden sm:inline">Move Controls</span>
+        <i class="fa-solid fa-up-down-left-right"></i><span class="hidden sm:inline">Move</span>
       </button>
       <button id="btn-full-map" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow-md flex items-center space-x-1">
         <i class="fa-solid fa-map"></i><span>Map</span>
@@ -53,7 +60,7 @@
     </div>
   </div>
 
-  <!-- EDIT LAYOUT BANNER OVERLAY -->
+  <!-- EDIT LAYOUT BANNER -->
   <div id="edit-layout-banner" class="absolute top-14 left-1/2 -translate-x-1/2 z-40 bg-amber-500 text-slate-950 font-bold text-xs px-4 py-1.5 rounded-full shadow-lg hidden flex items-center space-x-3 pointer-events-auto">
     <span> Drag touch controls to reposition</span>
     <button id="btn-reset-controls" class="bg-slate-900 text-white px-2 py-0.5 rounded text-[10px] uppercase">Reset</button>
@@ -64,7 +71,7 @@
   <div id="canvas-container" class="relative flex-1 w-full h-full overflow-hidden">
     <canvas id="gameCanvas" class="w-full h-full"></canvas>
 
-    <!-- TOUCH CONTROLS OVERLAYS -->
+    <!-- TOUCH CONTROLS -->
     <div id="ctrl-wheel-wrapper" class="floating-control hidden" style="bottom: 16px; left: 24px;">
       <div id="steering-wheel-container">
         <div id="steering-wheel">
@@ -89,7 +96,7 @@
     </div>
   </div>
 
-  <!-- 9. SEPARATED LOGIN & SIGN-UP AUTH MODAL -->
+  <!-- AUTHENTICATION MODAL -->
   <div id="modal-auth" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md hidden flex items-center justify-center p-4">
     <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
       <h1 class="text-3xl font-black italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 neon-text">TURBO MAZE</h1>
@@ -103,7 +110,6 @@
         <input type="text" id="auth-username" placeholder="Username" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500">
         <input type="password" id="auth-password" placeholder="Password" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500">
         
-        <!-- 10, 16. Color Picker in Sign Up Tab -->
         <div id="auth-color-section" class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-xl border border-slate-700 hidden">
           <span class="text-xs text-slate-300 font-bold">Initial Car Paint:</span>
           <input type="color" id="auth-color-picker" value="#3b82f6" class="w-8 h-8 rounded cursor-pointer bg-transparent border-none">
@@ -114,11 +120,9 @@
     </div>
   </div>
 
-  <!-- 4, 5, 11, 12. MAIN MENU MODAL WITH PROFILE, LEADERBOARD, SETTINGS & COIN COUNT -->
+  <!-- MAIN MENU MODAL -->
   <div id="modal-menu" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 space-y-4">
-      
-      <!-- Top Driver Profile & Coin Bar -->
       <div class="flex justify-between items-center bg-slate-800 p-3 rounded-xl border border-slate-700">
         <div class="flex items-center space-x-3 cursor-pointer" onclick="openProfileModal()">
           <div class="w-10 h-10 rounded-full bg-blue-600/30 border-2 border-blue-500 flex items-center justify-center text-blue-400 font-bold">
@@ -146,7 +150,7 @@
         <button onclick="startDailyChallenge()" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
           <i class="fa-solid fa-calendar-day"></i><span>24-Hour Daily Challenge</span>
         </button>
-        <button onclick="joinMultiplayerQueue()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
+        <button onclick="openMultiplayerSizeModal()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
           <i class="fa-solid fa-users"></i><span>Multiplayer Queue (1 Coin Entry)</span>
         </button>
         <button onclick="openGarageModal()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm">
@@ -160,7 +164,26 @@
     </div>
   </div>
 
-  <!-- 8. MULTIPLAYER WAITING ROOM MODAL -->
+  <!-- MULTIPLAYER SIZE SELECTION MODAL -->
+  <div id="modal-mp-size" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
+    <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
+      <h2 class="text-xl font-bold text-white">Select Multiplayer Grid</h2>
+      <p class="text-xs text-slate-400">Entry fee: 1 Coin. Larger grids yield massive payout multipliers!</p>
+      
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="joinMultiplayerWithGrid(25)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">25x25 (1x)</button>
+        <button onclick="joinMultiplayerWithGrid(50)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">50x50 (4x)</button>
+        <button onclick="joinMultiplayerWithGrid(75)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">75x75 (9x)</button>
+        <button onclick="joinMultiplayerWithGrid(100)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">100x100 (16x)</button>
+        <button onclick="joinMultiplayerWithGrid(150)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">150x150 (36x)</button>
+        <button onclick="joinMultiplayerWithGrid(200)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">200x200 (64x)</button>
+      </div>
+
+      <button onclick="closeModal('modal-mp-size'); openModal('modal-menu');" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-xl">Back</button>
+    </div>
+  </div>
+
+  <!-- MULTIPLAYER WAITING ROOM MODAL -->
   <div id="modal-waiting-room" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
       <div class="w-12 h-12 bg-indigo-500/20 border-2 border-indigo-400 rounded-full flex items-center justify-center mx-auto text-indigo-400 text-xl animate-spin">
@@ -178,7 +201,7 @@
     </div>
   </div>
 
-  <!-- 11. PLAYER PROFILE MODAL -->
+  <!-- PLAYER PROFILE MODAL -->
   <div id="modal-profile" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -207,7 +230,7 @@
     </div>
   </div>
 
-  <!-- 13, 14. 100 LEVEL CAMPAIGN MODAL (CLEANED SLIDER) -->
+  <!-- CAMPAIGN MODAL -->
   <div id="modal-levels" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-2xl w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-3">
@@ -219,7 +242,7 @@
     </div>
   </div>
 
-  <!-- 6, 7. 7-STAT DYNAMIC TUNING GARAGE -->
+  <!-- TUNING GARAGE MODAL -->
   <div id="modal-garage" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -230,7 +253,7 @@
     </div>
   </div>
 
-  <!-- 12, 16. SETTINGS MODAL WITH COLOR & AUDIO -->
+  <!-- SETTINGS MODAL -->
   <div id="modal-settings" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-3">
@@ -303,9 +326,13 @@
     </div>
   </div>
 
-  <!-- 17. PRE-RACE 3-SECOND COUNTDOWN OVERLAY -->
-  <div id="modal-countdown" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center">
+  <!-- 3-SECOND COUNTDOWN WITH TIPS -->
+  <div id="modal-countdown" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex flex-col items-center justify-center space-y-6 px-6 text-center">
     <div id="countdown-number" class="text-8xl font-black italic tracking-wider text-amber-400 neon-text animate-pulse">3</div>
+    <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl max-w-sm w-full shadow-xl">
+      <div class="text-[10px] text-amber-400 font-bold uppercase mb-1"><i class="fa-solid fa-lightbulb mr-1"></i> Pro Tip</div>
+      <div id="countdown-tip-text" class="text-xs text-slate-300">Upgrade your car from the garage for better performance and higher top speeds!</div>
+    </div>
   </div>
 
   <!-- VICTORY MODAL -->
