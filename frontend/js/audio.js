@@ -1,4 +1,3 @@
-// 18. ROBUST WEB AUDIO SYNTHESIZER FOR COUNTDOWN & IMPACTS
 class SoundSystem {
   constructor() {
     this.ctx = null;
