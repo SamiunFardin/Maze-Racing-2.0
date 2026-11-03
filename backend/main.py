@@ -134,6 +134,11 @@ async def update_controls(request: Request):
         USERS_DB[username]["control_pos"] = pos
     return {"status": "success"}
 
+@app.get("/api/leaderboard/richest")
+def get_richest_players():
+    sorted_users = sorted(USERS_DB.items(), key=lambda x: x[1]["coins"], reverse=True)
+    return [{"driver": uname, "coins": udata["coins"]} for uname, udata in sorted_users[:10]]
+
 @app.get("/api/leaderboard/level/{level_id}")
 def get_level_lb(level_id: int):
     if level_id == 9999:
