@@ -14,7 +14,12 @@ rooms = {}
 GRID_MULTIPLIERS = {25: 1, 50: 4, 75: 9, 100: 16, 150: 36, 200: 64}
 
 async def room_countdown_and_start(room_id):
-    await asyncio.sleep(20)
+    for remaining in range(20, 0, -1):
+        if room_id not in rooms or rooms[room_id]["status"] != "waiting":
+            return
+        await sio.emit("waiting_countdown_tick", {"remaining": remaining}, room=room_id)
+        await asyncio.sleep(1.0)
+
     if room_id in rooms and rooms[room_id]["status"] == "waiting":
         room = rooms[room_id]
         room["status"] = "racing"
@@ -91,7 +96,7 @@ async def player_finished(sid, data):
         if sid not in room["finishing_order"]:
             room["finishing_order"].append(sid)
             rank = len(room["finishing_order"])
-            total = len(room["players"])
+            total = max(1, len(room["players"]))
             multiplier = GRID_MULTIPLIERS.get(room["grid_size"], 1)
             payout = (total - rank + 1) * multiplier
 
