@@ -63,24 +63,37 @@ function generateDFSComplexMaze(cols, rows, seed) {
 }
 
 const CAMPAIGN_100_LEVELS = [];
-for (let i = 1; i <= 100; i++) {
+for (let i = 1; i <= 1300; i++) {
   let size = 25;
-  if (i > 20 && i <= 40) size = 50;
-  else if (i > 40 && i <= 60) size = 75;
-  else if (i > 60 && i <= 80) size = 100;
-  else if (i > 80 && i <= 90) size = 150;
-  else if (i > 90) size = 200;
+  if (i > 10 && i <= 50) size = 50;
+  else if (i > 50 && i <= 140) size = 75;
+  else if (i > 140 && i <= 300) size = 100;
+  else if (i > 300 && i <= 660) size = 150;
+  else if (i > 660) size = 200;
 
   CAMPAIGN_100_LEVELS.push({ id: i, name: `Level ${i}`, size: size, seed: 1000 + i * 37 });
 }
 
+const NIGHT_DRIVE_1300_LEVELS = [];
+for (let i = 1; i <= 1300; i++) {
+  let size = 25;
+  if (i > 10 && i <= 50) size = 50;
+  else if (i > 50 && i <= 140) size = 75;
+  else if (i > 140 && i <= 300) size = 100;
+  else if (i > 300 && i <= 660) size = 150;
+  else if (i > 660) size = 200;
+
+  NIGHT_DRIVE_1300_LEVELS.push({ id: i, name: `Night Level ${i}`, size: size, seed: 99999 + i * 53, isNightDrive: true });
+}
+
 const generatedMazesCache = {};
 function getOrGenerateMaze(cfg) {
-  if (!generatedMazesCache[cfg.id]) {
+  const cacheKey = `${cfg.isNightDrive ? 'night_' : 'std_'}_${cfg.id}`;
+  if (!generatedMazesCache[cacheKey]) {
     const gen = generateDFSComplexMaze(cfg.size, cfg.size, cfg.seed);
-    generatedMazesCache[cfg.id] = { ...cfg, ...gen, sizeLabel: `${cfg.size}x${cfg.size}` };
+    generatedMazesCache[cacheKey] = { ...cfg, ...gen, sizeLabel: `${cfg.size}x${cfg.size}` };
   }
-  return generatedMazesCache[cfg.id];
+  return generatedMazesCache[cacheKey];
 }
 
 let currentMaze = null;
@@ -410,7 +423,23 @@ function renderWorld() {
   ctx.fillRect(car.width / 2 - 9, -car.height / 2 + 2, 6, 4);
   ctx.restore();
 
-  if (gameActive && !isPaused) renderMiniMap();
+  if (currentMaze && currentMaze.isNightDrive) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    const radius = 2.5 * TILE_SIZE;
+    
+    const grad = ctx.createRadialGradient(screenCenterX, screenCenterY, radius * 0.4, screenCenterX, screenCenterY, radius);
+    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 1)');
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+
+  if (gameActive && !isPaused && (!currentMaze || !currentMaze.isNightDrive)) {
+    renderMiniMap();
+  }
 }
 
 function renderMiniMap() {
@@ -435,7 +464,6 @@ function renderMiniMap() {
     }
   }
 
-  // Draw trail on minimap
   if (carTrailPath.length > 1) {
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 2;
