@@ -182,7 +182,6 @@ function tuneCurrentStat(stat_name, value) {
   });
 }
 
-// CONTROL REPOSITIONING FLOW
 function skipControlAdjustment() {
   document.getElementById('modal-adjust-prompt').classList.add('hidden');
   document.getElementById('modal-menu').classList.remove('hidden');
@@ -203,7 +202,12 @@ document.getElementById('btn-save-controls').onclick = () => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: currentUser, pos })
   });
-  document.getElementById('modal-menu').classList.remove('hidden');
+  
+  if (gameActive) {
+    document.getElementById('modal-pause').classList.remove('hidden');
+  } else {
+    document.getElementById('modal-menu').classList.remove('hidden');
+  }
 };
 
 document.getElementById('btn-reset-controls').onclick = () => {
@@ -222,7 +226,6 @@ function applyControlPosition(pos) {
   }
 }
 
-// MULTIPLAYER SIZE SELECTION & WAITING ROOM
 function openMultiplayerSizeModal() {
   document.getElementById('modal-menu').classList.add('hidden');
   document.getElementById('modal-mp-size').classList.remove('hidden');
@@ -235,6 +238,7 @@ function joinMultiplayerWithGrid(gridSize) {
   }
   document.getElementById('modal-mp-size').classList.add('hidden');
   document.getElementById('modal-waiting-room').classList.remove('hidden');
+  document.getElementById('waiting-countdown-val').innerText = "20";
   socket.emit('join_multiplayer', { username: currentUser, grid_size: gridSize, color: car.color });
 }
 
@@ -243,7 +247,6 @@ function cancelMultiplayerQueue() {
   document.getElementById('modal-menu').classList.remove('hidden');
 }
 
-// DAILY CHALLENGE HANDLERS
 function openDailyChallengeMenu() {
   document.getElementById('modal-menu').classList.add('hidden');
   document.getElementById('modal-daily-menu').classList.remove('hidden');
@@ -267,6 +270,13 @@ socket.on('waiting_room_update', (data) => {
   window.currentRoomId = data.room_id;
   document.getElementById('waiting-count').innerText = data.count;
   document.getElementById('waiting-players-list').innerHTML = data.players.map(p => `<div>• ${p}</div>`).join('');
+});
+
+socket.on('waiting_countdown_tick', (data) => {
+  const timerElem = document.getElementById('waiting-countdown-val');
+  if (timerElem) {
+    timerElem.innerText = data.remaining;
+  }
 });
 
 socket.on('start_multiplayer_race', (data) => {
@@ -293,28 +303,40 @@ function handleCampaignVictory(level_id, time_ms, is_daily = false) {
 }
 
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+}
 
 function openLevelsModal() {
   openModal('modal-levels');
-  renderLevelSelector();
+  renderLevelSelector(CAMPAIGN_100_LEVELS, 'levels-container');
+}
+
+function openNightDriveLevelsModal() {
+  openModal('modal-night-levels');
+  renderLevelSelector(NIGHT_DRIVE_1300_LEVELS, 'night-levels-container');
 }
 
 function openGarageModal() {
-  document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
+  document.querySelectorAll('[id^="modal-"]').forEach(m => {
+    if (m.id !== 'modal-pause') m.classList.add('hidden');
+  });
   openModal('modal-garage');
   renderGarageUI();
 }
 
 function openSettingsModal() {
-  document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
+  document.querySelectorAll('[id^="modal-"]').forEach(m => {
+    if (m.id !== 'modal-pause') m.classList.add('hidden');
+  });
   openModal('modal-settings');
 }
 
 function openProfileModal() {
   document.getElementById('profile-username').innerText = currentUser;
   document.getElementById('profile-coins').innerText = userCoins;
-  document.getElementById('profile-cleared-count').innerText = `${completedLevels.length} / 100`;
+  document.getElementById('profile-cleared-count').innerText = `${completedLevels.length} / 2600`;
   document.getElementById('profile-total-wealth').innerText = userCoins;
   openModal('modal-profile');
 }
@@ -322,8 +344,11 @@ function openProfileModal() {
 function openLeaderboardsModal() {
   openModal('modal-leaderboards');
   const sel = document.getElementById('lb-level-select');
-  sel.innerHTML = `<option value="9999">🌟 Daily Challenge Arena</option>` + CAMPAIGN_100_LEVELS.map(m => `<option value="${m.id}">${m.name} (${m.size}x${m.size})</option>`).join('');
-  fetchLeaderboard(9999);
+  sel.innerHTML = `<option value="richest">💰 Richest Players (Career Wealth)</option>` +
+    `<option value="9999">🌟 Daily Challenge Arena</option>` + 
+    CAMPAIGN_100_LEVELS.map(m => `<option value="${m.id}">${m.name} (${m.size}x${m.size})</option>`).join('') +
+    NIGHT_DRIVE_1300_LEVELS.map(m => `<option value="${10000 + m.id}">${m.name} (${m.size}x${m.size})</option>`).join('');
+  fetchLeaderboard("richest");
 }
 
 function openRewardTiersModal() {
@@ -331,7 +356,8 @@ function openRewardTiersModal() {
 }
 
 function fetchLeaderboard(level_id) {
-  fetch(`${backendUrl}/api/leaderboard/level/${level_id}`)
+  const endpoint = level_id === "richest" ? `${backendUrl}/api/leaderboard/richest` : `${backendUrl}/api/leaderboard/level/${level_id}`;
+  fetch(endpoint)
     .then(res => res.json())
     .then(records => {
       const list = document.getElementById('lb-list-container');
@@ -339,19 +365,28 @@ function fetchLeaderboard(level_id) {
         list.innerHTML = '<div class="text-center text-slate-400 py-4 text-xs">No records yet.</div>';
         return;
       }
-      list.innerHTML = records.map((r, i) => `
-        <div class="p-2.5 bg-slate-800 rounded-xl flex justify-between items-center text-xs">
-          <span class="font-bold ${i===0?'text-amber-400':'text-slate-300'}">#${i+1} ${r.driver}</span>
-          <span class="font-mono text-emerald-400 font-bold">${formatTime(r.timeMs)}</span>
-        </div>
-      `).join('');
+      if (level_id === "richest") {
+        list.innerHTML = records.map((r, i) => `
+          <div class="p-2.5 bg-slate-800 rounded-xl flex justify-between items-center text-xs">
+            <span class="font-bold ${i===0?'text-amber-400':'text-slate-300'}">#${i+1} ${r.driver}</span>
+            <span class="font-mono text-yellow-400 font-bold"><i class="fa-solid fa-coins mr-1"></i>${r.coins} Coins</span>
+          </div>
+        `).join('');
+      } else {
+        list.innerHTML = records.map((r, i) => `
+          <div class="p-2.5 bg-slate-800 rounded-xl flex justify-between items-center text-xs">
+            <span class="font-bold ${i===0?'text-amber-400':'text-slate-300'}">#${i+1} ${r.driver}</span>
+            <span class="font-mono text-emerald-400 font-bold">${formatTime(r.timeMs)}</span>
+          </div>
+        `).join('');
+      }
     });
 }
 
-function renderLevelSelector() {
-  const container = document.getElementById('levels-container');
+function renderLevelSelector(levelsArray, containerId) {
+  const container = document.getElementById(containerId);
   container.innerHTML = '';
-  CAMPAIGN_100_LEVELS.forEach(cfg => {
+  levelsArray.forEach(cfg => {
     const isUnlocked = cfg.id === 1 || completedLevels.includes(cfg.id - 1);
     const isCleared = completedLevels.includes(cfg.id);
 
@@ -388,6 +423,7 @@ function updateCarColor(color) {
 
 document.getElementById('btn-back-menu').onclick = () => {
   gameActive = false;
+  isPaused = false;
   document.getElementById('game-hud').classList.add('hidden');
   document.getElementById('modal-menu').classList.remove('hidden');
 };
@@ -402,7 +438,12 @@ document.getElementById('btn-open-settings').onclick = () => openSettingsModal()
 function togglePause() {
   if (!gameActive) return;
   isPaused = !isPaused;
-  document.getElementById('modal-pause').classList.toggle('hidden', !isPaused);
+  const pauseModal = document.getElementById('modal-pause');
+  pauseModal.classList.toggle('hidden', !isPaused);
+  if (!isPaused) {
+    startTime = performance.now() - elapsedTime;
+    gameLoop();
+  }
 }
 
 function restartCurrentLevel() {
@@ -413,6 +454,7 @@ function restartCurrentLevel() {
 function returnToMenuFromPause() {
   document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
   gameActive = false;
+  isPaused = false;
   document.getElementById('game-hud').classList.add('hidden');
   document.getElementById('modal-menu').classList.remove('hidden');
 }
@@ -425,8 +467,9 @@ function returnToMenuFromVictory() {
 
 function playNextLevel() {
   document.getElementById('modal-victory').classList.add('hidden');
-  if (currentMaze && currentMaze.id < 100) {
-    const nextCfg = CAMPAIGN_100_LEVELS.find(m => m.id === currentMaze.id + 1);
+  if (currentMaze && currentMaze.id < 1300) {
+    const listArray = currentMaze.isNightDrive ? NIGHT_DRIVE_1300_LEVELS : CAMPAIGN_100_LEVELS;
+    const nextCfg = listArray.find(m => m.id === currentMaze.id + 1);
     if (nextCfg) prepareAndStartLevel(nextCfg);
   }
 }
