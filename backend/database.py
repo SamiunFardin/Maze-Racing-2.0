@@ -1,7 +1,7 @@
 import datetime
 
 USERS_DB = {}
-LEVEL_LEADERBOARDS = {i: [] for i in range(1, 101)}
+LEVEL_LEADERBOARDS = {i: [] for i in range(1, 1301)}
 DAILY_LEADERBOARD = []
 
 def get_or_create_user(username, password, color="#3b82f6"):
