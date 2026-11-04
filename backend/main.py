@@ -1,3 +1,10 @@
+"""
+main.py
+-------
+FastAPI REST backend handling user authentication, campaign progress rewards, 
+garage stat upgrades/tuning, settings updates, and leaderboard data retrieval.
+"""
+
 from fastapi import FastAPI, HTTPException, Request
 import random
 import datetime
@@ -7,6 +14,7 @@ app = FastAPI(title="Turbo Maze Racer API")
 
 @app.post("/api/auth")
 async def authenticate_user(request: Request):
+    """Handles user login or new account registration."""
     data = await request.json()
     is_signup = data.get("is_signup", False)
     username = data.get("username", "").strip()
@@ -33,6 +41,7 @@ async def authenticate_user(request: Request):
 
 @app.post("/api/campaign/complete")
 async def complete_campaign(request: Request):
+    """Records level completion times, awards first-time clear coins, and updates leaderboards."""
     data = await request.json()
     username = data.get("username")
     level_id = int(data.get("level_id"))
@@ -78,6 +87,7 @@ async def complete_campaign(request: Request):
 
 @app.post("/api/garage/upgrade")
 async def upgrade_stat(request: Request):
+    """Purchases a tier upgrade for a specific vehicle stat using coins."""
     data = await request.json()
     username = data.get("username")
     stat_name = data.get("stat_name")
@@ -100,6 +110,7 @@ async def upgrade_stat(request: Request):
 
 @app.post("/api/garage/tune")
 async def tune_stat(request: Request):
+    """Adjusts the active operating value of an unlocked vehicle stat."""
     data = await request.json()
     username = data.get("username")
     stat_name = data.get("stat_name")
@@ -118,6 +129,7 @@ async def tune_stat(request: Request):
 
 @app.post("/api/settings/color")
 async def update_color(request: Request):
+    """Updates the custom car paint color preference."""
     data = await request.json()
     username = data.get("username")
     color = data.get("color")
@@ -127,6 +139,7 @@ async def update_color(request: Request):
 
 @app.post("/api/settings/controls")
 async def update_controls(request: Request):
+    """Persists touch control layout coordinates."""
     data = await request.json()
     username = data.get("username")
     pos = data.get("pos")
@@ -136,11 +149,13 @@ async def update_controls(request: Request):
 
 @app.get("/api/leaderboard/richest")
 def get_richest_players():
+    """Returns top 10 players sorted by career coin wealth."""
     sorted_users = sorted(USERS_DB.items(), key=lambda x: x[1]["coins"], reverse=True)
     return [{"driver": uname, "coins": udata["coins"]} for uname, udata in sorted_users[:10]]
 
 @app.get("/api/leaderboard/level/{level_id}")
 def get_level_lb(level_id: int):
+    """Returns top 10 fastest times for a specific campaign or daily challenge level."""
     if level_id == 9999:
         return DAILY_LEADERBOARD[:10]
     return LEVEL_LEADERBOARDS.get(level_id, [])[:10]
