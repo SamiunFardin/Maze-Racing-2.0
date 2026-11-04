@@ -1,3 +1,10 @@
+/**
+ * audio.js
+ * --------
+ * Web Audio API synthesizer system handling procedural sound effects (SFX),
+ * countdown beeps, recoil collisions, and victory fanfare melodies.
+ */
+
 class SoundSystem {
   constructor() {
     this.ctx = null;
@@ -7,6 +14,7 @@ class SoundSystem {
     this.sfxVol = 1.0;
   }
 
+  /** Initializes or resumes the browser AudioContext upon user interaction. */
   init() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -16,6 +24,7 @@ class SoundSystem {
     }
   }
 
+  /** Plays a synthesized tone frequency for UI feedback and countdowns. */
   playBeep(frequency, duration, type = 'sine') {
     if (!this.sfxEnabled) return;
     this.init();
@@ -35,6 +44,7 @@ class SoundSystem {
     }
   }
 
+  /** Plays a harsh mechanical impact sound when crashing into maze walls. */
   playRecoilImpact() {
     if (!this.sfxEnabled) return;
     this.init();
@@ -53,6 +63,7 @@ class SoundSystem {
     } catch(e) {}
   }
 
+  /** Plays a victorious multi-note chord sequence upon completing a maze. */
   playVictoryFanfare() {
     if (!this.sfxEnabled) return;
     this.init();
