@@ -1,3 +1,11 @@
+/**
+ * game.js
+ * -------
+ * Core procedural maze generator (DFS algorithm), vehicle physics simulation,
+ * rendering engine, minimap, touch controls, and level state handlers.
+ */
+
+/** Linear Congruential Generator for reproducible procedural maze seeds. */
 function LCG(seed) {
   let s = seed;
   return function() {
@@ -6,6 +14,7 @@ function LCG(seed) {
   };
 }
 
+/** Generates complex labyrinth grids using Depth-First Search (DFS) algorithm. */
 function generateDFSComplexMaze(cols, rows, seed) {
   const rng = LCG(seed);
   const gridCols = cols % 2 === 0 ? cols + 1 : cols;
@@ -48,6 +57,7 @@ function generateDFSComplexMaze(cols, rows, seed) {
     }
   }
 
+  // Clear start and finish zones
   grid[1][1] = 0; grid[1][2] = 0; grid[2][1] = 0;
   grid[gridRows - 2][gridCols - 2] = 0;
   grid[gridRows - 2][gridCols - 3] = 0;
@@ -62,6 +72,7 @@ function generateDFSComplexMaze(cols, rows, seed) {
   };
 }
 
+// Campaign level definitions (1300 Standard Levels & 1300 Night Drive Levels)
 const CAMPAIGN_100_LEVELS = [];
 for (let i = 1; i <= 1300; i++) {
   let size = 25;
@@ -98,6 +109,7 @@ function getOrGenerateMaze(cfg) {
 
 let currentMaze = null;
 
+// Vehicle physics and state object
 const car = {
   x: 0,
   y: 0,
@@ -146,6 +158,7 @@ function resizeCanvas() {
   }
 }
 
+/** Binds touch and keyboard inputs for steering and pedals. */
 function setupControls() {
   const bindPedal = (id, prop) => {
     const el = document.getElementById(id);
@@ -183,6 +196,7 @@ function setupControls() {
   });
 }
 
+/** Enables dragging and repositioning of touch controls on screen. */
 function setupControlDragging() {
   const leftWrapper = document.getElementById('ctrl-buttons-wrapper');
   const rightWrapper = document.getElementById('ctrl-pedals-wrapper');
@@ -286,6 +300,7 @@ function startGameLoop() {
   gameLoop();
 }
 
+/** Updates car motion, steering physics, and wall collision detection. */
 function updatePhysics() {
   let turnInput = 0;
   if (inputs.steerLeft) turnInput = -1;
@@ -353,6 +368,7 @@ function updatePhysics() {
   }
 }
 
+/** Renders the maze world, driving trail, multiplayer ghosts, and car sprite. */
 function renderWorld() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const screenCenterX = canvas.width / 2;
@@ -442,6 +458,7 @@ function renderWorld() {
   }
 }
 
+/** Renders the live top-right corner HUD minimap. */
 function renderMiniMap() {
   const mapSize = 105;
   const x = canvas.width - mapSize - 12;
@@ -485,6 +502,7 @@ function renderMiniMap() {
   ctx.restore();
 }
 
+/** Renders the full overview maze map modal. */
 function renderFullMazeMap() {
   const containerW = fullMapCanvas.parentElement.clientWidth - 20;
   const containerH = fullMapCanvas.parentElement.clientHeight - 20;
