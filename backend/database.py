@@ -1,16 +1,29 @@
+"""
+database.py
+-----------
+In-memory database simulation storing user profiles, vehicle stats, 
+level progression, and global/level leaderboards.
+"""
+
 import datetime
 
+# Central in-memory storage dictionaries and lists
 USERS_DB = {}
 LEVEL_LEADERBOARDS = {i: [] for i in range(1, 1301)}
 DAILY_LEADERBOARD = []
 
-def get_or_create_user(username, password, color="#3b82f6"):
+def get_or_create_user(username: str, password: str, color: str = "#3b82f6") -> dict:
+    """
+    Retrieves an existing user profile or initializes a new one with 
+    default starting coins, stats, and preferences if not found.
+    """
     if username not in USERS_DB:
         USERS_DB[username] = {
             "password": password,
             "color": color,
-            "coins": 100,
+            "coins": 100,  # Starting currency balance
             "completed_levels": [],
+            # Vehicle tuning parameters with unlocked limits and current configured values
             "stats": {
                 "topSpeed": {"unlocked": 5.0, "current": 5.0, "min": 2.0, "max": 50.0, "step": 0.1},
                 "acceleration": {"unlocked": 0.03, "current": 0.03, "min": 0.01, "max": 0.30, "step": 0.01},
