@@ -1,3 +1,10 @@
+"""
+socket_server.py
+----------------
+ASGI WebSocket server configuration using python-socketio to manage 
+real-time multiplayer lobby matchmaking, countdowns, race synchronization, and payouts.
+"""
+
 import socketio
 import random
 import asyncio
@@ -5,16 +12,20 @@ from fastapi.staticfiles import StaticFiles
 from backend.main import app as fastapi_app
 from backend.database import USERS_DB
 
+# Mount static frontend directory
 fastapi_app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 
+# Initialize Socket.io Async Server
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)
 
 rooms = {}
 GRID_MULTIPLIERS = {25: 1, 50: 4, 75: 9, 100: 16, 150: 36, 200: 64}
 
-async def room_countdown_and_start(room_id):
-    for remaining in range(20, 0, -1):
+async def room_countdown_and_start(room_id: str):
+    """Manages the lobby countdown before starting a multiplayer race session."""
+    # Run a 10-second countdown for faster match starts and robust responsiveness
+    for remaining in range(10, 0, -1):
         if room_id not in rooms or rooms[room_id]["status"] != "waiting":
             return
         await sio.emit("waiting_countdown_tick", {"remaining": remaining}, room=room_id)
@@ -27,7 +38,7 @@ async def room_countdown_and_start(room_id):
             username = room["players"][sid]["username"]
             if username in USERS_DB:
                 if USERS_DB[username]["coins"] >= 1:
-                    USERS_DB[username]["coins"] -= 1
+                    USERS_DB[username]["coins"] -= 1  # Deduct 1 coin entry fee
                     room["players"][sid]["deducted"] = True
                 else:
                     room["players"][sid]["deducted"] = False
@@ -39,6 +50,7 @@ async def connect(sid, environ):
 
 @sio.event
 async def join_multiplayer(sid, data):
+    """Handles player matchmaking into grid-specific multiplayer rooms."""
     username = data.get("username")
     grid_size = data.get("grid_size", 25)
 
@@ -80,7 +92,8 @@ async def join_multiplayer(sid, data):
         "count": len(player_list)
     }, room=target_room)
 
-    if len(rooms[target_room]["players"]) == 20 and rooms[target_room]["status"] == "waiting":
+    # Automatically trigger start immediately if room reaches max capacity (e.g. 20 players)
+    if len(rooms[target_room]["players"]) >= 20 and rooms[target_room]["status"] == "waiting":
         rooms[target_room]["status"] = "racing"
         for s in rooms[target_room]["players"]:
             uname = rooms[target_room]["players"][s]["username"]
@@ -90,6 +103,7 @@ async def join_multiplayer(sid, data):
 
 @sio.event
 async def player_finished(sid, data):
+    """Calculates multiplayer rank payouts based on finishing order and grid size multipliers."""
     room_id = data.get("room_id")
     if room_id in rooms and sid in rooms[room_id]["players"]:
         room = rooms[room_id]
@@ -112,6 +126,7 @@ async def player_finished(sid, data):
 
 @sio.event
 async def player_move(sid, data):
+    """Broadcasts real-time car position coordinates and heading to other racers in the room."""
     room_id = data.get("room_id")
     if room_id in rooms and sid in rooms[room_id]["players"]:
         p = rooms[room_id]["players"][sid]
@@ -122,6 +137,7 @@ async def player_move(sid, data):
 
 @sio.event
 async def disconnect(sid):
+    """Cleans up player sessions from active multiplayer rooms upon disconnection."""
     for r_id, room in list(rooms.items()):
         if sid in room["players"]:
             del room["players"][sid]
