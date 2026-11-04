@@ -1,12 +1,19 @@
+/* ==========================================================================
+   Turbo Maze Racer - Main Stylesheet
+   ========================================================================== */
+
+/* Universal Reset & Touch Handling */
 * {
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
   box-sizing: border-box;
 }
+
 button {
   touch-action: manipulation;
 }
+
 body, html {
   margin: 0;
   padding: 0;
@@ -16,29 +23,38 @@ body, html {
   background-color: #0b0f19;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
+
 canvas {
   display: block;
 }
+
+/* Typography & Visual Effects */
 .neon-text {
   text-shadow: 0 0 10px rgba(59, 130, 246, 0.7);
 }
+
+/* Floating Control Customization & Dragging */
 .floating-control {
   position: absolute;
   z-index: 30;
   touch-action: none;
   pointer-events: auto;
 }
+
 .edit-mode-active .floating-control {
   outline: 2px dashed #f59e0b;
   outline-offset: 4px;
   cursor: move;
 }
+
+/* On-Screen Steering Wheel Styling */
 #steering-wheel-container {
   width: 140px;
   height: 140px;
   position: relative;
   touch-action: none;
 }
+
 #steering-wheel {
   width: 100%;
   height: 100%;
@@ -51,6 +67,7 @@ canvas {
   justify-content: center;
   transition: transform 0.03s linear;
 }
+
 #steering-wheel::before {
   content: '';
   position: absolute;
@@ -58,6 +75,7 @@ canvas {
   height: 12px;
   background: #3b82f6;
 }
+
 #steering-wheel::after {
   content: '';
   position: absolute;
@@ -65,6 +83,7 @@ canvas {
   width: 12px;
   background: #3b82f6;
 }
+
 .wheel-center {
   width: 44px;
   height: 44px;
@@ -77,10 +96,13 @@ canvas {
   justify-content: center;
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
 }
+
+/* Accelerator & Brake Pedals */
 .pedal {
   touch-action: none;
   transition: transform 0.08s ease-out, filter 0.08s;
 }
+
 .pedal:active, .pedal.active {
   transform: scale(0.92);
   filter: brightness(1.25);
