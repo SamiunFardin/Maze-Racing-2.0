@@ -1,3 +1,10 @@
+/**
+ * app.js
+ * ------
+ * Frontend client controller managing UI modals, user authentication, 
+ * local storage persistence, garage stats interaction, and Socket.io event listeners.
+ */
+
 let currentUser = null;
 let userCoins = 100;
 let completedLevels = [];
@@ -238,7 +245,7 @@ function joinMultiplayerWithGrid(gridSize) {
   }
   document.getElementById('modal-mp-size').classList.add('hidden');
   document.getElementById('modal-waiting-room').classList.remove('hidden');
-  document.getElementById('waiting-countdown-val').innerText = "20";
+  document.getElementById('waiting-countdown-val').innerText = "10";
   socket.emit('join_multiplayer', { username: currentUser, grid_size: gridSize, color: car.color });
 }
 
