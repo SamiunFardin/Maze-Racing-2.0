@@ -10,7 +10,9 @@
 </head>
 <body class="bg-slate-950 text-white flex flex-col h-screen w-screen overflow-hidden">
 
-  <!-- SPLASH SCREEN -->
+  <!-- ==========================================================================
+       SPLASH SCREEN
+       ========================================================================== -->
   <div id="splash-screen" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center space-y-4 px-6 text-center transition-opacity duration-700">
     <div class="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-500/50 animate-bounce">
       <i class="fa-solid fa-car-side text-4xl text-white"></i>
@@ -28,7 +30,9 @@
     </div>
   </div>
 
-  <!-- TOP HUD HEADER -->
+  <!-- ==========================================================================
+       TOP HUD HEADER
+       ========================================================================== -->
   <div id="game-hud" class="absolute top-0 left-0 right-0 z-40 flex justify-between items-center px-4 py-2 bg-slate-900/85 backdrop-blur-md border-b border-slate-800 pointer-events-auto hidden">
     <div class="flex items-center space-x-3">
       <button id="btn-back-menu" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center justify-center">
@@ -67,7 +71,9 @@
     <button id="btn-save-controls" class="bg-emerald-700 text-white px-2.5 py-0.5 rounded text-[10px] uppercase">Done</button>
   </div>
 
-  <!-- CANVAS CONTAINER & MOBILE SAFE FLOATING CONTROLS -->
+  <!-- ==========================================================================
+       GAME CANVAS & FLOATING TOUCH CONTROLS
+       ========================================================================== -->
   <div id="canvas-container" class="relative flex-1 w-full h-full overflow-hidden">
     <canvas id="gameCanvas" class="w-full h-full"></canvas>
 
@@ -89,6 +95,10 @@
       </div>
     </div>
   </div>
+
+  <!-- ==========================================================================
+       MODALS SECTION
+       ========================================================================== -->
 
   <!-- AUTHENTICATION MODAL -->
   <div id="modal-auth" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md hidden flex items-center justify-center p-4">
@@ -219,9 +229,8 @@
       </div>
       <h2 class="text-xl font-bold text-white">Finding Racers...</h2>
       
-      <!-- Small Font Countdown Timer Indicator -->
       <div class="text-[11px] text-slate-400 font-mono">
-        Race starting in <span id="waiting-countdown-val" class="text-amber-400 font-bold">20</span>s
+        Race starting in <span id="waiting-countdown-val" class="text-amber-400 font-bold">10</span>s
       </div>
       
       <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 max-h-40 overflow-y-auto">
@@ -262,7 +271,7 @@
     </div>
   </div>
 
-  <!-- CAMPAIGN MODAL (SCROLLING LEVELS) -->
+  <!-- CAMPAIGN MODAL -->
   <div id="modal-levels" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-2xl w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-3">
@@ -336,7 +345,7 @@
     </div>
   </div>
 
-  <!-- LEADERBOARDS MODAL WITH WEEKLY REWARDS -->
+  <!-- LEADERBOARDS MODAL -->
   <div id="modal-leaderboards" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[85vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -344,7 +353,6 @@
         <button class="btn-close-modal text-slate-400 hover:text-white p-1" onclick="closeModal('modal-leaderboards')"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
 
-      <!-- Weekly Reward Banner -->
       <div class="bg-gradient-to-r from-amber-900/40 to-yellow-900/40 border border-amber-500/40 p-3 rounded-xl flex justify-between items-center">
         <div>
           <div class="text-[10px] uppercase font-bold text-amber-400">Weekly Reward Reset</div>
@@ -402,7 +410,7 @@
     </div>
   </div>
 
-  <!-- PAUSE MODAL WITH GARAGE & CONTROLS REPOSITION BUTTONS -->
+  <!-- PAUSE MODAL -->
   <div id="modal-pause" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
     <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-3">
       <h2 class="text-2xl font-black text-white">GAME PAUSED</h2>
@@ -417,7 +425,7 @@
     </div>
   </div>
 
-  <!-- TRANSPARENT 3-SECOND COUNTDOWN WITH TIPS -->
+  <!-- COUNTDOWN MODAL -->
   <div id="modal-countdown" class="fixed inset-0 z-50 bg-slate-950/30 backdrop-blur-[2px] hidden flex flex-col items-center justify-center space-y-6 px-6 text-center pointer-events-none">
     <div id="countdown-number" class="text-6xl font-black italic tracking-wider text-amber-400 neon-text animate-pulse">3</div>
     <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl max-w-sm w-full shadow-2xl pointer-events-auto">
