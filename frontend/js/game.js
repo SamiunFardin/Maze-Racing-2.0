@@ -57,6 +57,7 @@ function generateDFSComplexMaze(cols, rows, seed) {
     }
   }
 
+  // FIX: Replaced invalid Python-style comment '#' with valid JavaScript comment '//'
   // Clear start and finish zones
   grid[1][1] = 0; grid[1][2] = 0; grid[2][1] = 0;
   grid[gridRows - 2][gridCols - 2] = 0;
