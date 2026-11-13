@@ -24,16 +24,20 @@ GRID_MULTIPLIERS = {25: 1, 50: 4, 75: 9, 100: 16, 150: 36, 200: 64}
 
 async def room_countdown_and_start(room_id: str):
     """Manages the lobby countdown before starting a multiplayer race session."""
+    print(f"[SERVER] Starting countdown loop for room: {room_id}")
     for remaining in range(10, 0, -1):
         if room_id not in rooms or rooms[room_id]["status"] != "waiting":
+            print(f"[SERVER] Countdown aborted for room: {room_id}")
             return
+        print(f"[SERVER] Room {room_id} tick: {remaining}")
         await sio.emit("waiting_countdown_tick", {"remaining": remaining}, room=room_id)
         await asyncio.sleep(1.0)
 
-    # Trigger race start for waiting room (works for 1 or more players)
+    # Trigger race start for waiting room
     if room_id in rooms and rooms[room_id]["status"] == "waiting":
         room = rooms[room_id]
         room["status"] = "racing"
+        print(f"[SERVER] Countdown finished. Launching race for room: {room_id} with {len(room['players'])} players.")
         for sid in room["players"]:
             username = room["players"][sid]["username"]
             if username in USERS_DB:
@@ -50,9 +54,10 @@ async def connect(sid, environ):
 
 @sio.event
 async def join_multiplayer(sid, data):
-    """Handles player matchmaking into grid-specific multiplayer rooms with proper task ordering."""
+    """Handles player matchmaking into grid-specific multiplayer rooms."""
     username = data.get("username")
     grid_size = int(data.get("grid_size", 25))
+    print(f"[SERVER] User {username} requested multiplayer join for grid size: {grid_size}")
 
     if username in USERS_DB:
         if USERS_DB[username]["coins"] < 1:
@@ -76,17 +81,18 @@ async def join_multiplayer(sid, data):
             "finishing_order": [],
             "status": "waiting"
         }
+        print(f"[SERVER] Created new multiplayer room: {target_room}")
 
-    # Register player and enter socket room FIRST before spawning the countdown task
     rooms[target_room]["players"][sid] = {
         "username": username,
         "color": data.get("color", "#3b82f6"),
         "x": 0, "y": 0, "angle": 0,
         "deducted": False
     }
-    sio.enter_room(sid, target_room)
 
-    # Spawn countdown task only after room and player connection are fully established
+    sio.enter_room(sid, target_room)
+    print(f"[SERVER] Sid {sid} entered socket room {target_room}")
+
     if is_new_room:
         asyncio.create_task(room_countdown_and_start(target_room))
 
