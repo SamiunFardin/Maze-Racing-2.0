@@ -15,6 +15,42 @@ let isNewRegistration = false;
 const backendUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : window.location.origin;
 const socket = io(backendUrl);
 
+// Explicit socket connection debugging & event binding
+socket.on('connect', () => {
+  console.log('[SOCKET] Connected to server with ID:', socket.id);
+});
+
+socket.on('waiting_room_update', (data) => {
+  console.log('[SOCKET] waiting_room_update received:', data);
+  window.currentRoomId = data.room_id;
+  document.getElementById('waiting-count').innerText = data.count;
+  document.getElementById('waiting-players-list').innerHTML = data.players.map(p => `<div>• ${p}</div>`).join('');
+});
+
+socket.on('waiting_countdown_tick', (data) => {
+  console.log('[SOCKET] waiting_countdown_tick received:', data.remaining);
+  const timerElem = document.getElementById('waiting-countdown-val');
+  if (timerElem) {
+    timerElem.innerText = data.remaining;
+  }
+});
+
+socket.on('start_multiplayer_race', (data) => {
+  console.log('[SOCKET] start_multiplayer_race received:', data);
+  document.getElementById('modal-waiting-room').classList.add('hidden');
+  const gridSz = data.grid_size || 25;
+  const mpConfig = { id: 8888, name: "Multiplayer Arena", size: gridSz, seed: Math.floor(Math.random()*10000) };
+  prepareAndStartLevel(mpConfig);
+});
+
+socket.on('player_payout', (data) => {
+  userCoins = data.total_coins;
+  updateHUDCoins();
+  alert(`Multiplayer Finished! Rank #${data.rank} - Earned ${data.payout} Coins!`);
+});
+
+socket.on('error_message', (data) => alert(data.detail));
+
 window.addEventListener('load', () => {
   const splashTip = document.getElementById('splash-tip-text');
   if (splashTip) {
@@ -246,6 +282,7 @@ function joinMultiplayerWithGrid(gridSize) {
   document.getElementById('modal-mp-size').classList.add('hidden');
   document.getElementById('modal-waiting-room').classList.remove('hidden');
   document.getElementById('waiting-countdown-val').innerText = "10";
+  console.log('[CLIENT] Emitting join_multiplayer with grid size:', gridSize);
   socket.emit('join_multiplayer', { username: currentUser, grid_size: gridSize, color: car.color });
 }
 
@@ -272,25 +309,6 @@ function openDailyLeaderboard() {
   document.getElementById('lb-level-select').value = "9999";
   fetchLeaderboard(9999);
 }
-
-socket.on('waiting_room_update', (data) => {
-  window.currentRoomId = data.room_id;
-  document.getElementById('waiting-count').innerText = data.count;
-  document.getElementById('waiting-players-list').innerHTML = data.players.map(p => `<div>• ${p}</div>`).join('');
-});
-
-socket.on('waiting_countdown_tick', (data) => {
-  const timerElem = document.getElementById('waiting-countdown-val');
-  if (timerElem) {
-    timerElem.innerText = data.remaining;
-  }
-});
-
-socket.on('start_multiplayer_race', (data) => {
-  document.getElementById('modal-waiting-room').classList.add('hidden');
-  const mpConfig = { id: 8888, name: "Multiplayer Arena", size: 25, seed: Math.floor(Math.random()*10000) };
-  prepareAndStartLevel(mpConfig);
-});
 
 function handleCampaignVictory(level_id, time_ms, is_daily = false) {
   fetch(`${backendUrl}/api/campaign/complete`, {
@@ -480,11 +498,3 @@ function playNextLevel() {
     if (nextCfg) prepareAndStartLevel(nextCfg);
   }
 }
-
-socket.on('player_payout', (data) => {
-  userCoins = data.total_coins;
-  updateHUDCoins();
-  alert(`Multiplayer Finished! Rank #${data.rank} - Earned ${data.payout} Coins!`);
-});
-
-socket.on('error_message', (data) => alert(data.detail));
