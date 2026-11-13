@@ -13,11 +13,20 @@ let currentAuthMode = 'login';
 let isNewRegistration = false;
 
 const backendUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : window.location.origin;
-const socket = io(backendUrl);
 
-// Explicit socket connection debugging & event binding
+// FIX: Initialize socket with polling and websocket transports explicitly enabled to prevent connection drop hangs
+const socket = io(backendUrl, {
+  transports: ['websocket', 'polling'],
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000
+});
+
 socket.on('connect', () => {
-  console.log('[SOCKET] Connected to server with ID:', socket.id);
+  console.log('[SOCKET] Connected to server successfully with ID:', socket.id);
+});
+
+socket.on('connect_error', (err) => {
+  console.error('[SOCKET] Connection error:', err);
 });
 
 socket.on('waiting_room_update', (data) => {
@@ -283,6 +292,12 @@ function joinMultiplayerWithGrid(gridSize) {
   document.getElementById('modal-waiting-room').classList.remove('hidden');
   document.getElementById('waiting-countdown-val').innerText = "10";
   console.log('[CLIENT] Emitting join_multiplayer with grid size:', gridSize);
+  
+  if (!socket.connected) {
+    console.warn('[CLIENT] Socket not connected yet, forcing reconnect...');
+    socket.connect();
+  }
+  
   socket.emit('join_multiplayer', { username: currentUser, grid_size: gridSize, color: car.color });
 }
 
