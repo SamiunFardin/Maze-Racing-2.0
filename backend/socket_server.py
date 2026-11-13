@@ -33,7 +33,7 @@ async def room_countdown_and_start(room_id: str):
         await sio.emit("waiting_countdown_tick", {"remaining": remaining}, room=room_id)
         await asyncio.sleep(1.0)
 
-    # Trigger race start for waiting room
+    # Trigger race start for waiting room (works for 1 or more players)
     if room_id in rooms and rooms[room_id]["status"] == "waiting":
         room = rooms[room_id]
         room["status"] = "racing"
@@ -46,13 +46,14 @@ async def room_countdown_and_start(room_id: str):
                     room["players"][sid]["deducted"] = True
                 else:
                     room["players"][sid]["deducted"] = False
-        await sio.emit("start_multiplayer_race", {"room_id": room_id}, room=room_id)
+        await sio.emit("start_multiplayer_race", {"room_id": room_id, "grid_size": room["grid_size"]}, room=room_id)
 
 @sio.event
 async def connect(sid, environ):
     print(f"Client connected: {sid}")
 
-@sio.event
+# FIX: Use explicit @sio.on to preserve underscore event names emitted by client (app.js)
+@sio.on('join_multiplayer')
 async def join_multiplayer(sid, data):
     """Handles player matchmaking into grid-specific multiplayer rooms."""
     username = data.get("username")
@@ -110,9 +111,9 @@ async def join_multiplayer(sid, data):
             uname = rooms[target_room]["players"][s]["username"]
             if uname in USERS_DB and USERS_DB[uname]["coins"] >= 1:
                 USERS_DB[uname]["coins"] -= 1
-        await sio.emit("start_multiplayer_race", {"room_id": target_room}, room=target_room)
+        await sio.emit("start_multiplayer_race", {"room_id": target_room, "grid_size": rooms[target_room]["grid_size"]}, room=target_room)
 
-@sio.event
+@sio.on('player_finished')
 async def player_finished(sid, data):
     """Calculates multiplayer rank payouts based on finishing order and grid size multipliers."""
     room_id = data.get("room_id")
@@ -135,7 +136,7 @@ async def player_finished(sid, data):
                 "total_coins": USERS_DB[username]["coins"] if username in USERS_DB else 0
             }, room=sid)
 
-@sio.event
+@sio.on('player_move')
 async def player_move(sid, data):
     """Broadcasts real-time car position coordinates and heading to other racers in the room."""
     room_id = data.get("room_id")
