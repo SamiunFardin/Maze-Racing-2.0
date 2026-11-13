@@ -24,13 +24,13 @@ GRID_MULTIPLIERS = {25: 1, 50: 4, 75: 9, 100: 16, 150: 36, 200: 64}
 
 async def room_countdown_and_start(room_id: str):
     """Manages the lobby countdown before starting a multiplayer race session."""
-    # Run a 10-second countdown for faster match starts and robust responsiveness
     for remaining in range(10, 0, -1):
         if room_id not in rooms or rooms[room_id]["status"] != "waiting":
             return
         await sio.emit("waiting_countdown_tick", {"remaining": remaining}, room=room_id)
         await asyncio.sleep(1.0)
 
+    # Trigger race start for waiting room (works for 1 or more players)
     if room_id in rooms and rooms[room_id]["status"] == "waiting":
         room = rooms[room_id]
         room["status"] = "racing"
@@ -50,9 +50,9 @@ async def connect(sid, environ):
 
 @sio.event
 async def join_multiplayer(sid, data):
-    """Handles player matchmaking into grid-specific multiplayer rooms."""
+    """Handles player matchmaking into grid-specific multiplayer rooms with proper task ordering."""
     username = data.get("username")
-    grid_size = data.get("grid_size", 25)
+    grid_size = int(data.get("grid_size", 25))
 
     if username in USERS_DB:
         if USERS_DB[username]["coins"] < 1:
@@ -61,11 +61,13 @@ async def join_multiplayer(sid, data):
 
     target_room = None
     for r_id, room in rooms.items():
-        if room["grid_size"] == grid_size and room["status"] == "waiting" and len(room["players"]) < 20:
+        if int(room["grid_size"]) == grid_size and room["status"] == "waiting" and len(room["players"]) < 20:
             target_room = r_id
             break
 
+    is_new_room = False
     if not target_room:
+        is_new_room = True
         target_room = f"room_{grid_size}_{random.randint(1000, 9999)}"
         rooms[target_room] = {
             "room_id": target_room,
@@ -74,17 +76,20 @@ async def join_multiplayer(sid, data):
             "finishing_order": [],
             "status": "waiting"
         }
-        asyncio.create_task(room_countdown_and_start(target_room))
 
+    # Register player and enter socket room FIRST before spawning the countdown task
     rooms[target_room]["players"][sid] = {
         "username": username,
         "color": data.get("color", "#3b82f6"),
         "x": 0, "y": 0, "angle": 0,
         "deducted": False
     }
-
     sio.enter_room(sid, target_room)
-    
+
+    # Spawn countdown task only after room and player connection are fully established
+    if is_new_room:
+        asyncio.create_task(room_countdown_and_start(target_room))
+
     player_list = [p["username"] for p in rooms[target_room]["players"].values()]
     await sio.emit("waiting_room_update", {
         "room_id": target_room,
@@ -92,7 +97,7 @@ async def join_multiplayer(sid, data):
         "count": len(player_list)
     }, room=target_room)
 
-    # Automatically trigger start immediately if room reaches max capacity (e.g. 20 players)
+    # Start immediately if room reaches max capacity (20 players)
     if len(rooms[target_room]["players"]) >= 20 and rooms[target_room]["status"] == "waiting":
         rooms[target_room]["status"] = "racing"
         for s in rooms[target_room]["players"]:
