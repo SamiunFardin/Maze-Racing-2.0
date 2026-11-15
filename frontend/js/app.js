@@ -11,10 +11,10 @@ let completedLevels = [];
 let userStats = {};
 let currentAuthMode = 'login';
 let isNewRegistration = false;
+window.currentRoomId = null;
 
 const backendUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : window.location.origin;
 
-// FIX: Initialize socket with polling and websocket transports explicitly enabled to prevent connection drop hangs
 const socket = io(backendUrl, {
   transports: ['websocket', 'polling'],
   reconnectionAttempts: 5,
@@ -46,10 +46,17 @@ socket.on('waiting_countdown_tick', (data) => {
 
 socket.on('start_multiplayer_race', (data) => {
   console.log('[SOCKET] start_multiplayer_race received:', data);
+  window.currentRoomId = data.room_id;
   document.getElementById('modal-waiting-room').classList.add('hidden');
   const gridSz = data.grid_size || 25;
   const mpConfig = { id: 8888, name: "Multiplayer Arena", size: gridSz, seed: Math.floor(Math.random()*10000) };
   prepareAndStartLevel(mpConfig);
+});
+
+socket.on('ghost_update', (data) => {
+  for (let sid in data) {
+    multiplayerGhosts[sid] = data[sid];
+  }
 });
 
 socket.on('player_payout', (data) => {
@@ -291,6 +298,7 @@ function joinMultiplayerWithGrid(gridSize) {
   document.getElementById('modal-mp-size').classList.add('hidden');
   document.getElementById('modal-waiting-room').classList.remove('hidden');
   document.getElementById('waiting-countdown-val').innerText = "10";
+  window.currentRoomId = null;
   console.log('[CLIENT] Emitting join_multiplayer with grid size:', gridSize);
   
   if (!socket.connected) {
