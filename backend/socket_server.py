@@ -23,8 +23,10 @@ rooms = {}
 GRID_MULTIPLIERS = {25: 1, 50: 4, 75: 9, 100: 16, 150: 36, 200: 64}
 
 async def room_countdown_and_start(room_id: str):
-    """Manages the lobby countdown and guarantees race start even for single players."""
+    """Manages the lobby countdown and guarantees race start for all participants."""
     print(f"[SERVER] Starting 10s countdown coroutine for room: {room_id}")
+    rooms[room_id]["countdown_active"] = True
+
     for remaining in range(10, 0, -1):
         if room_id not in rooms:
             print(f"[SERVER] Room {room_id} deleted during countdown.")
@@ -41,6 +43,7 @@ async def room_countdown_and_start(room_id: str):
     if room_id in rooms and rooms[room_id]["status"] == "waiting":
         room = rooms[room_id]
         room["status"] = "racing"
+        room["countdown_active"] = False
         print(f"[SERVER] Countdown completed! Launching race for room: {room_id} with {len(room['players'])} players.")
         
         for sid in room["players"]:
@@ -60,7 +63,7 @@ async def connect(sid, environ):
 
 @sio.on('join_multiplayer')
 async def join_multiplayer(sid, data):
-    """Handles player matchmaking into grid-specific multiplayer rooms."""
+    """Handles player matchmaking into grid-specific multiplayer rooms with robust cleanup."""
     username = data.get("username")
     grid_size = int(data.get("grid_size", 25))
     print(f"[SERVER] Received join_multiplayer from {username} for grid {grid_size} (SID: {sid})")
@@ -70,6 +73,14 @@ async def join_multiplayer(sid, data):
             await sio.emit("error_message", {"detail": "Multiplayer entry requires 1 coin!"}, room=sid)
             return
 
+    # Cleanup: remove sid from any existing rooms first to prevent ghost mapping
+    for r_id, r_data in list(rooms.items()):
+        if sid in r_data["players"]:
+            del r_data["players"][sid]
+            if not r_data["players"]:
+                del rooms[r_id]
+
+    # Find an available waiting room matching the requested grid size
     target_room = None
     for r_id, room in rooms.items():
         if int(room["grid_size"]) == grid_size and room["status"] == "waiting" and len(room["players"]) < 20:
@@ -85,7 +96,8 @@ async def join_multiplayer(sid, data):
             "grid_size": grid_size,
             "players": {},
             "finishing_order": [],
-            "status": "waiting"
+            "status": "waiting",
+            "countdown_active": False
         }
         print(f"[SERVER] Created brand new room: {target_room}")
 
@@ -107,8 +119,8 @@ async def join_multiplayer(sid, data):
         "count": len(player_list)
     }, room=target_room)
 
-    # Spawn countdown task if new room
-    if is_new_room:
+    # Spawn countdown task if new room and not already running
+    if is_new_room and not rooms[target_room]["countdown_active"]:
         asyncio.create_task(room_countdown_and_start(target_room))
 
     # Start immediately if room reaches max capacity (20 players)
