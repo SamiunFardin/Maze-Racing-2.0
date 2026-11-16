@@ -12,44 +12,81 @@ from fastapi.staticfiles import StaticFiles
 from backend.main import app as fastapi_app
 from backend.database import USERS_DB
 
-# Mount static frontend directory
-fastapi_app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
-
 # Initialize Socket.io Async Server
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*', ping_timeout=60, ping_interval=25)
 socket_app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)
 
+# Mount static frontend directory on fastapi_app (must come after API routes)
+fastapi_app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+
 rooms = {}
 GRID_MULTIPLIERS = {25: 1, 50: 4, 75: 9, 100: 16, 150: 36, 200: 64}
 
+async def start_race_for_room(room_id: str):
+    """Transitions room to racing state, deducts entry fee, and launches all clients."""
+    if room_id not in rooms:
+        return
+    room = rooms[room_id]
+    if room["status"] != "waiting":
+        return
+
+    room["status"] = "racing"
+    room["countdown_active"] = False
+    print(f"[SERVER] Launching race for room {room_id} with {len(room['players'])} players (Seed: {room['seed']}).")
+
+    for sid, pdata in list(room["players"].items()):
+        username = pdata["username"]
+        if username in USERS_DB and USERS_DB[username]["coins"] >= 1:
+            USERS_DB[username]["coins"] -= 1
+
+    await sio.emit(
+        "start_multiplayer_race",
+        {
+            "room_id": room_id,
+            "grid_size": room["grid_size"],
+            "seed": room["seed"]
+        },
+        room=room_id
+    )
+
 async def room_countdown_and_start(room_id: str):
-    """Guaranteed countdown timer that forces race start when reaching 0."""
-    print(f"[SERVER] Starting infallible 10s countdown for room: {room_id}")
+    """10-second lobby countdown timer that broadcasts ticks and starts the race at 0."""
+    if room_id not in rooms:
+        return
     rooms[room_id]["countdown_active"] = True
+    print(f"[SERVER] Starting 10s countdown for room: {room_id}")
 
-    for remaining in range(10, 0, -1):
-        if room_id not in rooms:
-            return
-        # Broadcast countdown tick to all clients in this room
-        await sio.emit("waiting_countdown_tick", {"remaining": remaining}, room=room_id)
-        await asyncio.sleep(1.0)
+    try:
+        for remaining in range(10, 0, -1):
+            if room_id not in rooms:
+                return
+            room = rooms[room_id]
+            if room["status"] != "waiting" or not room["players"]:
+                return
+            room["remaining"] = remaining
+            await sio.emit("waiting_countdown_tick", {"remaining": remaining}, room=room_id)
+            await asyncio.sleep(1.0)
 
-    # Force start race when countdown hits zero
-    if room_id in rooms:
-        room = rooms[room_id]
-        room["status"] = "racing"
-        room["countdown_active"] = False
-        print(f"[SERVER] Countdown reached 0. Force-starting race for room: {room_id} with {len(room['players'])} players.")
+        await start_race_for_room(room_id)
+    except Exception as e:
+        print(f"[SERVER] Error in countdown for {room_id}: {e}")
+        await start_race_for_room(room_id)
 
-        # Deduct entry coins
-        for sid in room["players"]:
-            username = room["players"][sid]["username"]
-            if username in USERS_DB:
-                if USERS_DB[username]["coins"] >= 1:
-                    USERS_DB[username]["coins"] -= 1
-
-        # Emit start event to all clients in the room
-        await sio.emit("start_multiplayer_race", {"room_id": room_id, "grid_size": room["grid_size"]}, room=room_id)
+async def remove_sid_from_all_rooms(sid: str):
+    """Safely removes a socket SID from any room it currently occupies."""
+    for r_id, room in list(rooms.items()):
+        if sid in room["players"]:
+            del room["players"][sid]
+            await sio.leave_room(sid, r_id)
+            if not room["players"]:
+                del rooms[r_id]
+            else:
+                player_list = [p["username"] for p in room["players"].values()]
+                await sio.emit(
+                    "waiting_room_update",
+                    {"room_id": r_id, "players": player_list, "count": len(player_list)},
+                    room=r_id
+                )
 
 @sio.event
 async def connect(sid, environ):
@@ -57,24 +94,19 @@ async def connect(sid, environ):
 
 @sio.on('join_multiplayer')
 async def join_multiplayer(sid, data):
-    """Handles matchmaking, room allocation, and guarantees countdown initialization."""
-    username = data.get("username")
+    """Assigns player to a waiting room matching grid_size and awaits socket room entry."""
+    username = data.get("username") or f"Guest_{sid[:4]}"
     grid_size = int(data.get("grid_size", 25))
-    print(f"[SERVER] join_multiplayer received from {username} for grid {grid_size} (SID: {sid})")
+    print(f"[SERVER] join_multiplayer from {username} | grid={grid_size} | sid={sid}")
 
-    if username in USERS_DB:
-        if USERS_DB[username]["coins"] < 1:
-            await sio.emit("error_message", {"detail": "Multiplayer entry requires 1 coin!"}, room=sid)
-            return
+    if username in USERS_DB and USERS_DB[username]["coins"] < 1:
+        await sio.emit("error_message", {"detail": "Multiplayer entry requires 1 coin!"}, room=sid)
+        return
 
-    # Clean up any prior room presence for this SID
-    for r_id, r_data in list(rooms.items()):
-        if sid in r_data["players"]:
-            del r_data["players"][sid]
-            if not r_data["players"]:
-                del rooms[r_id]
+    # Clean up any previous room memberships for this socket
+    await remove_sid_from_all_rooms(sid)
 
-    # Find an open waiting room of the same grid size
+    # Find an open waiting room with matching grid size
     target_room = None
     for r_id, room in rooms.items():
         if int(room["grid_size"]) == grid_size and room["status"] == "waiting" and len(room["players"]) < 20:
@@ -88,43 +120,49 @@ async def join_multiplayer(sid, data):
         rooms[target_room] = {
             "room_id": target_room,
             "grid_size": grid_size,
+            "seed": random.randint(10000, 999999),
             "players": {},
             "finishing_order": [],
             "status": "waiting",
-            "countdown_active": False
+            "countdown_active": False,
+            "remaining": 10
         }
         print(f"[SERVER] Created new room: {target_room}")
 
-    # Add player to room
     rooms[target_room]["players"][sid] = {
         "username": username,
         "color": data.get("color", "#3b82f6"),
         "x": 0, "y": 0, "angle": 0
     }
 
-    sio.enter_room(sid, target_room)
-    print(f"[SERVER] SID {sid} entered socket room {target_room}. Count: {len(rooms[target_room]['players'])}")
+    # CRITICAL FIX: Must await enter_room in AsyncServer so room broadcasts actually reach this SID
+    await sio.enter_room(sid, target_room)
+    print(f"[SERVER] SID {sid} joined room {target_room}. Players: {len(rooms[target_room]['players'])}")
 
-    # Broadcast updated player list
     player_list = [p["username"] for p in rooms[target_room]["players"].values()]
-    await sio.emit("waiting_room_update", {
-        "room_id": target_room,
-        "players": player_list,
-        "count": len(player_list)
-    }, room=target_room)
+    await sio.emit(
+        "waiting_room_update",
+        {
+            "room_id": target_room,
+            "players": player_list,
+            "count": len(player_list)
+        },
+        room=target_room
+    )
 
-    # Trigger countdown task if it's a new room and not already running
+    # Send current remaining countdown immediately to the newly joined client
+    await sio.emit("waiting_countdown_tick", {"remaining": rooms[target_room]["remaining"]}, room=sid)
+
     if is_new_room and not rooms[target_room]["countdown_active"]:
         asyncio.create_task(room_countdown_and_start(target_room))
 
-    # Instant start if room is full (20 players)
     if len(rooms[target_room]["players"]) >= 20 and rooms[target_room]["status"] == "waiting":
-        rooms[target_room]["status"] = "racing"
-        for s in rooms[target_room]["players"]:
-            uname = rooms[target_room]["players"][s]["username"]
-            if uname in USERS_DB and USERS_DB[uname]["coins"] >= 1:
-                USERS_DB[uname]["coins"] -= 1
-        await sio.emit("start_multiplayer_race", {"room_id": target_room, "grid_size": rooms[target_room]["grid_size"]}, room=target_room)
+        await start_race_for_room(target_room)
+
+@sio.on('leave_multiplayer')
+async def leave_multiplayer(sid, data=None):
+    print(f"[SERVER] leave_multiplayer from {sid}")
+    await remove_sid_from_all_rooms(sid)
 
 @sio.on('player_finished')
 async def player_finished(sid, data):
@@ -161,11 +199,4 @@ async def player_move(sid, data):
 @sio.event
 async def disconnect(sid):
     print(f"[SERVER] Client disconnected: {sid}")
-    for r_id, room in list(rooms.items()):
-        if sid in room["players"]:
-            del room["players"][sid]
-            player_list = [p["username"] for p in room["players"].values()]
-            await sio.emit("waiting_room_update", {"room_id": r_id, "players": player_list, "count": len(player_list)}, room=r_id)
-            if not room["players"]:
-                del rooms[r_id]
-            break
+    await remove_sid_from_all_rooms(sid)
