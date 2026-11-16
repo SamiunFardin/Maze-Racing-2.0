@@ -22,7 +22,7 @@ const socket = io(backendUrl, {
 });
 
 socket.on('connect', () => {
-  console.log('[SOCKET] Connected to server successfully with ID:', socket.id);
+  console.log('[SOCKET] Connected with ID:', socket.id);
 });
 
 socket.on('connect_error', (err) => {
@@ -30,14 +30,14 @@ socket.on('connect_error', (err) => {
 });
 
 socket.on('waiting_room_update', (data) => {
-  console.log('[SOCKET] waiting_room_update received:', data);
+  console.log('[SOCKET] waiting_room_update:', data);
   window.currentRoomId = data.room_id;
   document.getElementById('waiting-count').innerText = data.count;
   document.getElementById('waiting-players-list').innerHTML = data.players.map(p => `<div>• ${p}</div>`).join('');
 });
 
 socket.on('waiting_countdown_tick', (data) => {
-  console.log('[SOCKET] waiting_countdown_tick received:', data.remaining);
+  console.log('[SOCKET] waiting_countdown_tick:', data.remaining);
   const timerElem = document.getElementById('waiting-countdown-val');
   if (timerElem) {
     timerElem.innerText = data.remaining;
@@ -45,11 +45,14 @@ socket.on('waiting_countdown_tick', (data) => {
 });
 
 socket.on('start_multiplayer_race', (data) => {
-  console.log('[SOCKET] start_multiplayer_race received:', data);
+  console.log('[SOCKET] start_multiplayer_race received! Launching game...', data);
   window.currentRoomId = data.room_id;
-  document.getElementById('modal-waiting-room').classList.add('hidden');
+  
+  // Force hide waiting modal and any other overlapping menus immediately
+  document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
+  
   const gridSz = data.grid_size || 25;
-  const mpConfig = { id: 8888, name: "Multiplayer Arena", size: gridSz, seed: Math.floor(Math.random()*10000) };
+  const mpConfig = { id: 8888, name: "Multiplayer Arena", size: gridSz, seed: Math.floor(Math.random() * 10000) };
   prepareAndStartLevel(mpConfig);
 });
 
@@ -299,10 +302,9 @@ function joinMultiplayerWithGrid(gridSize) {
   document.getElementById('modal-waiting-room').classList.remove('hidden');
   document.getElementById('waiting-countdown-val').innerText = "10";
   window.currentRoomId = null;
-  console.log('[CLIENT] Emitting join_multiplayer with grid size:', gridSize);
+  console.log('[CLIENT] Emitting join_multiplayer for grid:', gridSize);
   
   if (!socket.connected) {
-    console.warn('[CLIENT] Socket not connected yet, forcing reconnect...');
     socket.connect();
   }
   
