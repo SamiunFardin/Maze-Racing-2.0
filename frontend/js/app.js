@@ -12,17 +12,22 @@ let userStats = {};
 let currentAuthMode = 'login';
 let isNewRegistration = false;
 window.currentRoomId = null;
+let pendingJoinPayload = null;
 
 const backendUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : window.location.origin;
 
 const socket = io(backendUrl, {
-  transports: ['websocket', 'polling'],
+  transports: ['polling', 'websocket'],
   reconnectionAttempts: 5,
   reconnectionDelay: 1000
 });
 
 socket.on('connect', () => {
   console.log('[SOCKET] Connected with ID:', socket.id);
+  if (pendingJoinPayload) {
+    socket.emit('join_multiplayer', pendingJoinPayload);
+    pendingJoinPayload = null;
+  }
 });
 
 socket.on('connect_error', (err) => {
@@ -47,12 +52,15 @@ socket.on('waiting_countdown_tick', (data) => {
 socket.on('start_multiplayer_race', (data) => {
   console.log('[SOCKET] start_multiplayer_race received! Launching game...', data);
   window.currentRoomId = data.room_id;
-  
-  // Force hide waiting modal and any other overlapping menus immediately
+  multiplayerGhosts = {};
+  userCoins = Math.max(0, userCoins - 1);
+  updateHUDCoins();
+
   document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
-  
+
   const gridSz = data.grid_size || 25;
-  const mpConfig = { id: 8888, name: "Multiplayer Arena", size: gridSz, seed: Math.floor(Math.random() * 10000) };
+  const sharedSeed = data.seed || Math.floor(Math.random() * 10000);
+  const mpConfig = { id: 8888, name: "Multiplayer Arena", size: gridSz, seed: sharedSeed };
   prepareAndStartLevel(mpConfig);
 });
 
@@ -301,17 +309,26 @@ function joinMultiplayerWithGrid(gridSize) {
   document.getElementById('modal-mp-size').classList.add('hidden');
   document.getElementById('modal-waiting-room').classList.remove('hidden');
   document.getElementById('waiting-countdown-val').innerText = "10";
+  document.getElementById('waiting-players-list').innerHTML = `<div>• ${currentUser || 'Driver'}</div>`;
   window.currentRoomId = null;
-  console.log('[CLIENT] Emitting join_multiplayer for grid:', gridSize);
   
-  if (!socket.connected) {
+  const payload = { username: currentUser, grid_size: gridSize, color: car.color };
+  console.log('[CLIENT] Requesting join_multiplayer:', payload);
+
+  if (socket.connected) {
+    socket.emit('join_multiplayer', payload);
+  } else {
+    pendingJoinPayload = payload;
     socket.connect();
   }
-  
-  socket.emit('join_multiplayer', { username: currentUser, grid_size: gridSize, color: car.color });
 }
 
 function cancelMultiplayerQueue() {
+  pendingJoinPayload = null;
+  if (socket.connected) {
+    socket.emit('leave_multiplayer', { room_id: window.currentRoomId });
+  }
+  window.currentRoomId = null;
   document.getElementById('modal-waiting-room').classList.add('hidden');
   document.getElementById('modal-menu').classList.remove('hidden');
 }
@@ -474,6 +491,7 @@ function updateCarColor(color) {
 document.getElementById('btn-back-menu').onclick = () => {
   gameActive = false;
   isPaused = false;
+  window.currentRoomId = null;
   document.getElementById('game-hud').classList.add('hidden');
   document.getElementById('modal-menu').classList.remove('hidden');
 };
@@ -505,6 +523,7 @@ function returnToMenuFromPause() {
   document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
   gameActive = false;
   isPaused = false;
+  window.currentRoomId = null;
   document.getElementById('game-hud').classList.add('hidden');
   document.getElementById('modal-menu').classList.remove('hidden');
 }
@@ -512,6 +531,7 @@ function returnToMenuFromPause() {
 function returnToMenuFromVictory() {
   document.getElementById('modal-victory').classList.add('hidden');
   document.getElementById('game-hud').classList.add('hidden');
+  window.currentRoomId = null;
   document.getElementById('modal-menu').classList.remove('hidden');
 }
 
