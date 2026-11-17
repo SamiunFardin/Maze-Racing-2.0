@@ -124,8 +124,24 @@ let gameActive = false;
 let isPaused = false;
 let startTime = 0;
 let pausedTimeTotal = 0;
+let pauseStartedAt = 0;
 let elapsedTime = 0;
 let animFrameId = null;
+
+// Minimap bounding box for touch/click detection
+let minimapRect = { x: 0, y: 0, size: 110 };
+
+// Full Map Zoom & Pan state
+let fullMapState = {
+  zoom: 1.0,
+  panX: 0,
+  panY: 0,
+  isDragging: false,
+  lastX: 0,
+  lastY: 0,
+  initialPinchDist: null,
+  initialZoom: 1.0
+};
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -138,6 +154,8 @@ window.addEventListener('load', () => {
   window.addEventListener('resize', resizeCanvas);
   setupControls();
   setupControlDragging();
+  setupMinimapTap();
+  setupFullMapGestures();
 });
 
 function resizeCanvas() {
@@ -146,6 +164,129 @@ function resizeCanvas() {
     canvas.width = container.clientWidth;
     canvas.height = container.clientHeight;
   }
+}
+
+function isMultiplayerMatch() {
+  return Boolean(window.currentRoomId);
+}
+
+function setupMinimapTap() {
+  const handleTap = (clientX, clientY) => {
+    if (!gameActive || !currentMaze || currentMaze.isNightDrive) return;
+    if (!document.getElementById('edit-layout-banner').classList.contains('hidden')) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    if (
+      x >= minimapRect.x &&
+      x <= minimapRect.x + minimapRect.size &&
+      y >= minimapRect.y &&
+      y <= minimapRect.y + minimapRect.size
+    ) {
+      openFullMapModal();
+    }
+  };
+
+  canvas.addEventListener('click', (e) => handleTap(e.clientX, e.clientY));
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches && e.touches.length === 1) {
+      handleTap(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }, { passive: true });
+}
+
+function openFullMapModal() {
+  if (!currentMaze) return;
+  resetFullMapTransform();
+  openModal('modal-full-map');
+  renderFullMazeMap();
+}
+
+function resetFullMapTransform() {
+  fullMapState.zoom = 1.0;
+  fullMapState.panX = 0;
+  fullMapState.panY = 0;
+  fullMapState.isDragging = false;
+  fullMapState.initialPinchDist = null;
+}
+
+function setupFullMapGestures() {
+  if (!fullMapCanvas) return;
+
+  // 1-Finger Touch Pan & 2-Finger Pinch-to-Zoom
+  fullMapCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      fullMapState.isDragging = true;
+      fullMapState.lastX = e.touches[0].clientX;
+      fullMapState.lastY = e.touches[0].clientY;
+      fullMapState.initialPinchDist = null;
+    } else if (e.touches.length === 2) {
+      fullMapState.isDragging = false;
+      fullMapState.initialPinchDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      fullMapState.initialZoom = fullMapState.zoom;
+    }
+  }, { passive: false });
+
+  fullMapCanvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1 && fullMapState.isDragging) {
+      const dx = e.touches[0].clientX - fullMapState.lastX;
+      const dy = e.touches[0].clientY - fullMapState.lastY;
+      fullMapState.panX += dx;
+      fullMapState.panY += dy;
+      fullMapState.lastX = e.touches[0].clientX;
+      fullMapState.lastY = e.touches[0].clientY;
+      renderFullMazeMap();
+    } else if (e.touches.length === 2 && fullMapState.initialPinchDist) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const scaleFactor = dist / fullMapState.initialPinchDist;
+      fullMapState.zoom = Math.max(0.5, Math.min(8.0, fullMapState.initialZoom * scaleFactor));
+      renderFullMazeMap();
+    }
+  }, { passive: false });
+
+  fullMapCanvas.addEventListener('touchend', () => {
+    fullMapState.isDragging = false;
+    fullMapState.initialPinchDist = null;
+  });
+
+  // Desktop Mouse Drag Pan & Wheel Zoom support
+  fullMapCanvas.addEventListener('mousedown', (e) => {
+    fullMapState.isDragging = true;
+    fullMapState.lastX = e.clientX;
+    fullMapState.lastY = e.clientY;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!fullMapState.isDragging) return;
+    const dx = e.clientX - fullMapState.lastX;
+    const dy = e.clientY - fullMapState.lastY;
+    fullMapState.panX += dx;
+    fullMapState.panY += dy;
+    fullMapState.lastX = e.clientX;
+    fullMapState.lastY = e.clientY;
+    renderFullMazeMap();
+  });
+
+  window.addEventListener('mouseup', () => {
+    fullMapState.isDragging = false;
+  });
+
+  fullMapCanvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 0.87;
+    fullMapState.zoom = Math.max(0.5, Math.min(8.0, fullMapState.zoom * factor));
+    renderFullMazeMap();
+  }, { passive: false });
 }
 
 function setupControls() {
@@ -229,7 +370,7 @@ const GAME_TIPS = [
   "Upgrade your car from the garage for better performance and higher top speeds!",
   "Brake early before entering tight maze corners to avoid punishing wall recoils.",
   "Larger multiplayer grids award massive exponential coin payouts for 1st place!",
-  "Keep your momentum up on long straightaways by fine-tuning your friction slider.",
+  "Tap the top-right minimap anytime to open the zoomable full maze map.",
   "Daily challenges reset every 24 hours with a brand new procedural track for everyone."
 ];
 
@@ -248,6 +389,12 @@ function prepareAndStartLevel(mazeConfig) {
   car.angle = 0;
   car.isColliding = false;
   carTrailPath.push({ x: car.x, y: car.y });
+
+  // Reset inputs so car never auto-accelerates
+  inputs.gas = false;
+  inputs.brake = false;
+  inputs.steerLeft = false;
+  inputs.steerRight = false;
 
   document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
 
@@ -284,6 +431,7 @@ function startGameLoop() {
   isPaused = false;
   startTime = performance.now();
   pausedTimeTotal = 0;
+  pauseStartedAt = 0;
   if (animFrameId) cancelAnimationFrame(animFrameId);
   gameLoop();
 }
@@ -355,6 +503,32 @@ function updatePhysics() {
   }
 }
 
+function drawNameTag(context, label, x, y, bgColor = 'rgba(15, 23, 42, 0.85)', textColor = '#f8fafc') {
+  if (!label) return;
+  context.save();
+  context.font = 'bold 11px system-ui, -apple-system, sans-serif';
+  const paddingX = 6;
+  const textWidth = context.measureText(label).width;
+  const boxW = textWidth + paddingX * 2;
+  const boxH = 18;
+  const boxX = x - boxW / 2;
+  const boxY = y - boxH;
+
+  context.fillStyle = bgColor;
+  context.beginPath();
+  context.roundRect(boxX, boxY, boxW, boxH, 5);
+  context.fill();
+  context.strokeStyle = 'rgba(148, 163, 184, 0.45)';
+  context.lineWidth = 1;
+  context.stroke();
+
+  context.fillStyle = textColor;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(label, x, boxY + boxH / 2);
+  context.restore();
+}
+
 function renderWorld() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const screenCenterX = canvas.width / 2;
@@ -386,24 +560,39 @@ function renderWorld() {
     ctx.stroke();
   }
 
-  ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
+  ctx.fillStyle = 'rgba(16, 185, 129, 0.45)';
   ctx.fillRect(currentMaze.start.x * TILE_SIZE, currentMaze.start.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-  ctx.fillStyle = 'rgba(245, 158, 11, 0.4)';
+  ctx.fillStyle = 'rgba(245, 158, 11, 0.5)';
   ctx.fillRect(currentMaze.finish.x * TILE_SIZE, currentMaze.finish.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
+  // Render opponent ghosts + upright usernames in Multiplayer
   for (let sid in multiplayerGhosts) {
     let g = multiplayerGhosts[sid];
     ctx.save();
     ctx.translate(g.x, g.y);
     ctx.rotate(g.angle);
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.6;
     ctx.fillStyle = g.color || '#94a3b8';
-    ctx.fillRect(-car.width/2, -car.height/2, car.width, car.height);
+    ctx.beginPath();
+    ctx.roundRect(-car.width / 2, -car.height / 2, car.width, car.height, 7);
+    ctx.fill();
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2;
+    ctx.stroke();
     ctx.restore();
+
+    if (isMultiplayerMatch() && g.username) {
+      ctx.save();
+      ctx.translate(g.x, g.y);
+      ctx.rotate(car.angle); // Keep label upright relative to player's screen camera
+      drawNameTag(ctx, g.username, 0, -car.height / 2 - 10, 'rgba(15, 23, 42, 0.85)', '#fde047');
+      ctx.restore();
+    }
   }
 
   ctx.restore();
 
+  // Render Player's Car at center
   ctx.save();
   ctx.translate(screenCenterX, screenCenterY);
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -423,6 +612,11 @@ function renderWorld() {
   ctx.fillStyle = car.isColliding ? '#ef4444' : '#fef08a';
   ctx.fillRect(-car.width / 2 + 3, -car.height / 2 + 2, 6, 4);
   ctx.fillRect(car.width / 2 - 9, -car.height / 2 + 2, 6, 4);
+
+  // Render local player's username above car in Multiplayer mode
+  if (isMultiplayerMatch() && typeof currentUser === 'string' && currentUser) {
+    drawNameTag(ctx, currentUser, 0, -car.height / 2 - 10, 'rgba(37, 99, 235, 0.9)', '#ffffff');
+  }
   ctx.restore();
 
   if (currentMaze && currentMaze.isNightDrive) {
@@ -437,36 +631,61 @@ function renderWorld() {
     ctx.restore();
   }
 
-  if (gameActive && !isPaused && (!currentMaze || !currentMaze.isNightDrive)) {
+  if (gameActive && (!currentMaze || !currentMaze.isNightDrive)) {
     renderMiniMap();
   }
 }
 
 function renderMiniMap() {
-  const mapSize = 105;
+  const mapSize = 110;
   const x = canvas.width - mapSize - 12;
   const y = 65;
+  minimapRect = { x, y, size: mapSize };
 
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+  ctx.save();
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
   ctx.fillRect(x, y, mapSize, mapSize);
-  ctx.strokeStyle = '#334155';
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 1.5;
   ctx.strokeRect(x, y, mapSize, mapSize);
 
+  const cellW = mapSize / currentMaze.cols;
+  const cellH = mapSize / currentMaze.rows;
   const scaleX = mapSize / (currentMaze.cols * TILE_SIZE);
   const scaleY = mapSize / (currentMaze.rows * TILE_SIZE);
 
+  // Walls
   for (let r = 0; r < currentMaze.rows; r++) {
     for (let c = 0; c < currentMaze.cols; c++) {
       if (currentMaze.grid[r][c] === 1) {
         ctx.fillStyle = '#475569';
-        ctx.fillRect(x + c * TILE_SIZE * scaleX, y + r * TILE_SIZE * scaleY, Math.max(1, TILE_SIZE * scaleX), Math.max(1, TILE_SIZE * scaleY));
+        ctx.fillRect(x + c * cellW, y + r * cellH, Math.max(1, cellW), Math.max(1, cellH));
       }
     }
   }
 
+  // Start Marker (Bright Green)
+  ctx.fillStyle = '#10b981';
+  ctx.fillRect(
+    x + currentMaze.start.x * cellW - 1,
+    y + currentMaze.start.y * cellH - 1,
+    Math.max(4, cellW + 2),
+    Math.max(4, cellH + 2)
+  );
+
+  // Finish Marker (Bright Gold/Amber)
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillRect(
+    x + currentMaze.finish.x * cellW - 1,
+    y + currentMaze.finish.y * cellH - 1,
+    Math.max(4, cellW + 2),
+    Math.max(4, cellH + 2)
+  );
+
+  // Player Trail
   if (carTrailPath.length > 1) {
     ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.moveTo(x + carTrailPath[0].x * scaleX, y + carTrailPath[0].y * scaleY);
     for (let i = 1; i < carTrailPath.length; i++) {
@@ -475,35 +694,134 @@ function renderMiniMap() {
     ctx.stroke();
   }
 
+  // Opponent Ghosts on Minimap
+  for (let sid in multiplayerGhosts) {
+    const g = multiplayerGhosts[sid];
+    ctx.fillStyle = g.color || '#facc15';
+    ctx.beginPath();
+    ctx.arc(x + g.x * scaleX, y + g.y * scaleY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Player Position Arrow
   const carMinimapX = x + car.x * scaleX;
   const carMinimapY = y + car.y * scaleY;
   ctx.save();
   ctx.translate(carMinimapX, carMinimapY);
   ctx.rotate(car.angle);
   ctx.fillStyle = '#ef4444';
-  ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(3, 3); ctx.lineTo(-3, 3); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, -5);
+  ctx.lineTo(3.5, 3.5);
+  ctx.lineTo(-3.5, 3.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Subtle "TAP" hint label
+  ctx.fillStyle = 'rgba(226, 232, 240, 0.75)';
+  ctx.font = 'bold 8px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('TAP MAP', x + mapSize - 4, y + mapSize - 4);
   ctx.restore();
 }
 
 function renderFullMazeMap() {
-  const containerW = fullMapCanvas.parentElement.clientWidth - 20;
-  const containerH = fullMapCanvas.parentElement.clientHeight - 20;
+  if (!currentMaze || !fullMapCanvas) return;
+  const containerW = fullMapCanvas.parentElement.clientWidth - 16;
+  const containerH = fullMapCanvas.parentElement.clientHeight - 16;
+  if (containerW <= 0 || containerH <= 0) return;
+
   fullMapCanvas.width = containerW;
   fullMapCanvas.height = containerH;
   fullMapCtx.clearRect(0, 0, containerW, containerH);
 
-  const tileSize = Math.min(containerW / currentMaze.cols, containerH / currentMaze.rows);
+  const baseTileSize = Math.min(containerW / currentMaze.cols, containerH / currentMaze.rows);
+  const tileSize = baseTileSize * fullMapState.zoom;
   const mapWidth = tileSize * currentMaze.cols;
   const mapHeight = tileSize * currentMaze.rows;
-  const offsetX = (containerW - mapWidth) / 2;
-  const offsetY = (containerH - mapHeight) / 2;
 
+  const offsetX = (containerW - mapWidth) / 2 + fullMapState.panX;
+  const offsetY = (containerH - mapHeight) / 2 + fullMapState.panY;
+
+  fullMapCtx.save();
+
+  // Draw Maze Grid
   for (let r = 0; r < currentMaze.rows; r++) {
     for (let c = 0; c < currentMaze.cols; c++) {
-      fullMapCtx.fillStyle = currentMaze.grid[r][c] === 1 ? '#3b82f6' : '#0f172a';
-      fullMapCtx.fillRect(offsetX + c * tileSize, offsetY + r * tileSize, tileSize, tileSize);
+      fullMapCtx.fillStyle = currentMaze.grid[r][c] === 1 ? '#1e3a8a' : '#0f172a';
+      fullMapCtx.fillRect(offsetX + c * tileSize, offsetY + r * tileSize, tileSize + 0.5, tileSize + 0.5);
     }
   }
+
+  // Draw Start Tile (Green)
+  fullMapCtx.fillStyle = '#10b981';
+  fullMapCtx.fillRect(
+    offsetX + currentMaze.start.x * tileSize,
+    offsetY + currentMaze.start.y * tileSize,
+    tileSize,
+    tileSize
+  );
+
+  // Draw Finish Tile (Amber/Gold)
+  fullMapCtx.fillStyle = '#f59e0b';
+  fullMapCtx.fillRect(
+    offsetX + currentMaze.finish.x * tileSize,
+    offsetY + currentMaze.finish.y * tileSize,
+    tileSize,
+    tileSize
+  );
+
+  const worldToMapX = (wx) => offsetX + (wx / TILE_SIZE) * tileSize;
+  const worldToMapY = (wy) => offsetY + (wy / TILE_SIZE) * tileSize;
+
+  // Draw Car's Driven Trail
+  if (carTrailPath.length > 1) {
+    fullMapCtx.strokeStyle = '#38bdf8';
+    fullMapCtx.lineWidth = Math.max(2, tileSize * 0.28);
+    fullMapCtx.lineCap = 'round';
+    fullMapCtx.lineJoin = 'round';
+    fullMapCtx.beginPath();
+    fullMapCtx.moveTo(worldToMapX(carTrailPath[0].x), worldToMapY(carTrailPath[0].y));
+    for (let i = 1; i < carTrailPath.length; i++) {
+      fullMapCtx.lineTo(worldToMapX(carTrailPath[i].x), worldToMapY(carTrailPath[i].y));
+    }
+    fullMapCtx.stroke();
+  }
+
+  // Draw Multiplayer Ghosts on Full Map
+  for (let sid in multiplayerGhosts) {
+    const g = multiplayerGhosts[sid];
+    const gx = worldToMapX(g.x);
+    const gy = worldToMapY(g.y);
+    fullMapCtx.fillStyle = g.color || '#facc15';
+    fullMapCtx.beginPath();
+    fullMapCtx.arc(gx, gy, Math.max(4, tileSize * 0.35), 0, Math.PI * 2);
+    fullMapCtx.fill();
+  }
+
+  // Draw Current Car Position & Heading Arrow
+  const cx = worldToMapX(car.x);
+  const cy = worldToMapY(car.y);
+  const markerRadius = Math.max(5, tileSize * 0.45);
+
+  fullMapCtx.save();
+  fullMapCtx.translate(cx, cy);
+  fullMapCtx.rotate(car.angle);
+  fullMapCtx.fillStyle = '#ef4444';
+  fullMapCtx.strokeStyle = '#ffffff';
+  fullMapCtx.lineWidth = 1.5;
+  fullMapCtx.beginPath();
+  fullMapCtx.moveTo(0, -markerRadius * 1.3);
+  fullMapCtx.lineTo(markerRadius, markerRadius);
+  fullMapCtx.lineTo(0, markerRadius * 0.55);
+  fullMapCtx.lineTo(-markerRadius, markerRadius);
+  fullMapCtx.closePath();
+  fullMapCtx.fill();
+  fullMapCtx.stroke();
+  fullMapCtx.restore();
+
+  fullMapCtx.restore();
 }
 
 function triggerVictory() {
@@ -512,24 +830,48 @@ function triggerVictory() {
   document.getElementById('victory-final-time').innerText = formatTime(elapsedTime);
   document.getElementById('modal-victory').classList.remove('hidden');
 
-  if (window.currentRoomId && typeof socket !== 'undefined' && socket.connected) {
-    socket.emit('player_finished', { room_id: window.currentRoomId });
+  if (isMultiplayerMatch() && typeof socket !== 'undefined' && socket.connected) {
+    document.getElementById('victory-rank-display').innerText = "Calculating Multiplayer Standings...";
+    document.getElementById('victory-coin-payout').innerText = "Syncing with server...";
+    socket.emit('player_finished', {
+      room_id: window.currentRoomId,
+      client_time_ms: elapsedTime
+    });
   } else {
     handleCampaignVictory(currentMaze.id, elapsedTime, currentMaze.isDaily);
   }
 }
 
 function gameLoop() {
-  if (!gameActive || isPaused) return;
+  if (!gameActive) return;
+
+  // In Singleplayer, pause freezes physics & timer.
+  // In Multiplayer, the race timer and world never stop even if the pause overlay is open!
+  if (isPaused && !isMultiplayerMatch()) {
+    return;
+  }
+
   updatePhysics();
   renderWorld();
-  elapsedTime = performance.now() - startTime - pausedTimeTotal;
+
+  // Keep full map live-updated if it is currently open while racing
+  const fullMapModal = document.getElementById('modal-full-map');
+  if (fullMapModal && !fullMapModal.classList.contains('hidden')) {
+    renderFullMazeMap();
+  }
+
+  if (isMultiplayerMatch() && window.mpRaceStartTs) {
+    elapsedTime = Math.max(0, Date.now() - window.mpRaceStartTs);
+  } else {
+    elapsedTime = performance.now() - startTime - pausedTimeTotal;
+  }
+
   document.getElementById('hud-timer').innerText = formatTime(elapsedTime);
   animFrameId = requestAnimationFrame(gameLoop);
 }
 
 function formatTime(ms) {
-  if (!ms || isNaN(ms)) return '00:00.000';
+  if (ms === null || ms === undefined || isNaN(ms)) return '00:00.000';
   const mins = Math.floor(ms / 60000);
   const secs = Math.floor((ms % 60000) / 1000);
   const millis = Math.floor(ms % 1000);
