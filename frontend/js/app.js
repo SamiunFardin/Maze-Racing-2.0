@@ -2,7 +2,7 @@
  * app.js
  * ------
  * Frontend client controller managing UI modals, user authentication, 
- * local storage persistence, garage stats interaction, and Socket.io event listeners.
+ * local storage persistence, garage stats interaction, audio settings, and Socket.io event listeners.
  */
 
 let currentUser = null;
@@ -12,6 +12,7 @@ let userStats = {};
 let currentAuthMode = 'login';
 let isNewRegistration = false;
 window.currentRoomId = null;
+window.mpRaceStartTs = null;
 let pendingJoinPayload = null;
 
 const backendUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : window.location.origin;
@@ -42,7 +43,6 @@ socket.on('waiting_room_update', (data) => {
 });
 
 socket.on('waiting_countdown_tick', (data) => {
-  console.log('[SOCKET] waiting_countdown_tick:', data.remaining);
   const timerElem = document.getElementById('waiting-countdown-val');
   if (timerElem) {
     timerElem.innerText = data.remaining;
@@ -52,6 +52,8 @@ socket.on('waiting_countdown_tick', (data) => {
 socket.on('start_multiplayer_race', (data) => {
   console.log('[SOCKET] start_multiplayer_race received! Launching shared maze...', data);
   window.currentRoomId = data.room_id;
+  // Sync backend start timestamp (server sends Unix seconds; convert to client ms)
+  window.mpRaceStartTs = data.race_start_ts ? data.race_start_ts * 1000 : Date.now() + 3000;
   multiplayerGhosts = {};
   userCoins = Math.max(0, userCoins - 1);
   updateHUDCoins();
@@ -75,15 +77,55 @@ socket.on('ghost_update', (data) => {
   }
 });
 
+socket.on('ghost_removed', (data) => {
+  if (data && data.sid && multiplayerGhosts[data.sid]) {
+    delete multiplayerGhosts[data.sid];
+  }
+});
+
+function renderMultiplayerStandings(standings) {
+  const box = document.getElementById('victory-mp-standings');
+  if (!box) return;
+  if (!standings || standings.length === 0) {
+    box.classList.add('hidden');
+    return;
+  }
+  box.classList.remove('hidden');
+  box.innerHTML = `<div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Live Room Standings</div>` +
+    standings.map(s => `
+      <div class="flex justify-between items-center text-xs py-1 border-b border-slate-700/60 last:border-none">
+        <span class="font-bold ${s.status.includes('Forfeit') ? 'text-rose-400' : 'text-slate-200'}">
+          #${s.rank} ${s.username}
+        </span>
+        <span class="font-mono text-[11px] ${s.status.includes('Forfeit') ? 'text-rose-400' : 'text-emerald-400'}">
+          ${s.time_ms !== null ? formatTime(s.time_ms) : s.status}
+        </span>
+      </div>
+    `).join('');
+}
+
+socket.on('race_standings_update', (data) => {
+  if (data && data.standings) {
+    renderMultiplayerStandings(data.standings);
+  }
+});
+
 socket.on('player_payout', (data) => {
   userCoins = data.total_coins;
   updateHUDCoins();
-  alert(`Multiplayer Finished! Rank #${data.rank} - Earned ${data.payout} Coins!`);
+  document.getElementById('victory-final-time').innerText = formatTime(data.time_ms);
+  document.getElementById('victory-rank-display').innerText = `Multiplayer Rank #${data.rank} of ${data.total_players}`;
+  document.getElementById('victory-coin-payout').innerText = `+${data.payout} Coins Earned!`;
+  if (data.standings) {
+    renderMultiplayerStandings(data.standings);
+  }
 });
 
 socket.on('error_message', (data) => alert(data.detail));
 
 window.addEventListener('load', () => {
+  setupAudioSettingsControls();
+
   const splashTip = document.getElementById('splash-tip-text');
   if (splashTip) {
     splashTip.innerText = GAME_TIPS[Math.floor(Math.random() * GAME_TIPS.length)];
@@ -107,6 +149,35 @@ window.addEventListener('load', () => {
     }
   }, 2000);
 });
+
+function setupAudioSettingsControls() {
+  const bgmToggle = document.getElementById('setting-bgm-toggle');
+  const bgmVol = document.getElementById('setting-bgm-vol');
+  const sfxToggle = document.getElementById('setting-sfx-toggle');
+  const sfxVol = document.getElementById('setting-sfx-vol');
+
+  if (bgmToggle) {
+    bgmToggle.addEventListener('change', (e) => {
+      audioEngine.setBgmEnabled(e.target.checked);
+    });
+  }
+  if (bgmVol) {
+    bgmVol.addEventListener('input', (e) => {
+      audioEngine.setBgmVolume(e.target.value);
+    });
+  }
+  if (sfxToggle) {
+    sfxToggle.addEventListener('change', (e) => {
+      audioEngine.setSfxEnabled(e.target.checked);
+      if (e.target.checked) audioEngine.playBeep(660, 0.12);
+    });
+  }
+  if (sfxVol) {
+    sfxVol.addEventListener('input', (e) => {
+      audioEngine.setSfxVolume(e.target.value);
+    });
+  }
+}
 
 function switchAuthTab(mode) {
   currentAuthMode = mode;
@@ -316,9 +387,9 @@ function joinMultiplayerWithGrid(gridSize) {
   document.getElementById('waiting-countdown-val').innerText = "10";
   document.getElementById('waiting-players-list').innerHTML = `<div>• ${currentUser || 'Driver'}</div>`;
   window.currentRoomId = null;
+  window.mpRaceStartTs = null;
   
   const payload = { username: currentUser, grid_size: gridSize, color: car.color };
-  console.log('[CLIENT] Requesting join_multiplayer:', payload);
 
   if (socket.connected) {
     socket.emit('join_multiplayer', payload);
@@ -334,6 +405,7 @@ function cancelMultiplayerQueue() {
     socket.emit('leave_multiplayer', { room_id: window.currentRoomId });
   }
   window.currentRoomId = null;
+  window.mpRaceStartTs = null;
   document.getElementById('modal-waiting-room').classList.add('hidden');
   document.getElementById('modal-menu').classList.remove('hidden');
 }
@@ -358,6 +430,9 @@ function openDailyLeaderboard() {
 }
 
 function handleCampaignVictory(level_id, time_ms, is_daily = false) {
+  const mpStandingsBox = document.getElementById('victory-mp-standings');
+  if (mpStandingsBox) mpStandingsBox.classList.add('hidden');
+
   fetch(`${backendUrl}/api/campaign/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -493,18 +568,37 @@ function updateCarColor(color) {
   });
 }
 
-document.getElementById('btn-back-menu').onclick = () => {
+function forfeitAndExitMultiplayer() {
+  if (window.currentRoomId && socket.connected) {
+    socket.emit('leave_multiplayer', { room_id: window.currentRoomId });
+  }
+  window.currentRoomId = null;
+  window.mpRaceStartTs = null;
+  multiplayerGhosts = {};
   gameActive = false;
   isPaused = false;
-  window.currentRoomId = null;
+  document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
+  document.getElementById('game-hud').classList.add('hidden');
+  document.getElementById('modal-menu').classList.remove('hidden');
+}
+
+document.getElementById('btn-back-menu').onclick = () => {
+  if (isMultiplayerMatch()) {
+    const confirmLeave = confirm("Leaving a multiplayer race forfeits the match! You will receive 0 rewards and place last. Leave race?");
+    if (!confirmLeave) return;
+    forfeitAndExitMultiplayer();
+    return;
+  }
+  gameActive = false;
+  isPaused = false;
   document.getElementById('game-hud').classList.add('hidden');
   document.getElementById('modal-menu').classList.remove('hidden');
 };
+
 document.getElementById('btn-pause-game').onclick = () => togglePause();
 document.getElementById('btn-edit-controls-hud').onclick = () => startControlAdjustment();
 document.getElementById('btn-full-map').onclick = () => {
-  openModal('modal-full-map');
-  renderFullMazeMap();
+  openFullMapModal();
 };
 document.getElementById('btn-open-settings').onclick = () => openSettingsModal();
 
@@ -512,36 +606,81 @@ function togglePause() {
   if (!gameActive) return;
   isPaused = !isPaused;
   const pauseModal = document.getElementById('modal-pause');
-  pauseModal.classList.toggle('hidden', !isPaused);
-  if (!isPaused) {
-    startTime = performance.now() - elapsedTime;
-    gameLoop();
+  const titleEl = document.getElementById('pause-modal-title');
+  const subtitleEl = document.getElementById('pause-modal-subtitle');
+  const restartBtn = document.getElementById('btn-pause-restart');
+  const menuBtn = document.getElementById('btn-pause-main-menu');
+
+  if (isMultiplayerMatch()) {
+    // Multiplayer Pause Menu: Timer & race continue running in the background
+    if (titleEl) titleEl.innerText = "MULTIPLAYER OPTIONS";
+    if (subtitleEl) {
+      subtitleEl.innerText = "Race timer stays live! Leaving forfeits rewards & places you last.";
+      subtitleEl.classList.remove('hidden');
+    }
+    if (restartBtn) restartBtn.classList.add('hidden');
+    if (menuBtn) menuBtn.innerText = "Forfeit & Main Menu";
+    pauseModal.classList.toggle('hidden', !isPaused);
+  } else {
+    // Singleplayer Pause Menu: Stops timer & loop cleanly
+    if (titleEl) titleEl.innerText = "GAME PAUSED";
+    if (subtitleEl) subtitleEl.classList.add('hidden');
+    if (restartBtn) restartBtn.classList.remove('hidden');
+    if (menuBtn) menuBtn.innerText = "Main Menu";
+
+    pauseModal.classList.toggle('hidden', !isPaused);
+    if (isPaused) {
+      pauseStartedAt = performance.now();
+    } else {
+      if (pauseStartedAt > 0) {
+        pausedTimeTotal += performance.now() - pauseStartedAt;
+        pauseStartedAt = 0;
+      }
+      gameLoop();
+    }
   }
 }
 
 function restartCurrentLevel() {
+  if (isMultiplayerMatch()) return;
   document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
   prepareAndStartLevel(currentMaze);
 }
 
 function returnToMenuFromPause() {
+  if (isMultiplayerMatch()) {
+    forfeitAndExitMultiplayer();
+    return;
+  }
   document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
   gameActive = false;
   isPaused = false;
-  window.currentRoomId = null;
   document.getElementById('game-hud').classList.add('hidden');
   document.getElementById('modal-menu').classList.remove('hidden');
 }
 
 function returnToMenuFromVictory() {
+  if (isMultiplayerMatch() && socket.connected) {
+    socket.emit('leave_multiplayer', { room_id: window.currentRoomId });
+  }
   document.getElementById('modal-victory').classList.add('hidden');
   document.getElementById('game-hud').classList.add('hidden');
   window.currentRoomId = null;
+  window.mpRaceStartTs = null;
+  multiplayerGhosts = {};
   document.getElementById('modal-menu').classList.remove('hidden');
 }
 
 function playNextLevel() {
   document.getElementById('modal-victory').classList.add('hidden');
+  if (isMultiplayerMatch()) {
+    window.currentRoomId = null;
+    window.mpRaceStartTs = null;
+    multiplayerGhosts = {};
+    document.getElementById('game-hud').classList.add('hidden');
+    openMultiplayerSizeModal();
+    return;
+  }
   if (currentMaze && currentMaze.id < 1300) {
     const listArray = currentMaze.isNightDrive ? NIGHT_DRIVE_1300_LEVELS : CAMPAIGN_100_LEVELS;
     const nextCfg = listArray.find(m => m.id === currentMaze.id + 1);
