@@ -10,9 +10,7 @@
 </head>
 <body class="bg-slate-950 text-white flex flex-col h-screen w-screen overflow-hidden">
 
-  <!-- ==========================================================================
-       SPLASH SCREEN
-       ========================================================================== -->
+  <!-- SPLASH SCREEN -->
   <div id="splash-screen" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center space-y-4 px-6 text-center transition-opacity duration-700">
     <div class="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-500/50 animate-bounce">
       <i class="fa-solid fa-car-side text-4xl text-white"></i>
@@ -30,9 +28,7 @@
     </div>
   </div>
 
-  <!-- ==========================================================================
-       TOP HUD HEADER
-       ========================================================================== -->
+  <!-- TOP HUD HEADER -->
   <div id="game-hud" class="absolute top-0 left-0 right-0 z-40 flex justify-between items-center px-4 py-2 bg-slate-900/85 backdrop-blur-md border-b border-slate-800 pointer-events-auto hidden">
     <div class="flex items-center space-x-3">
       <button id="btn-back-menu" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center justify-center">
@@ -71,9 +67,7 @@
     <button id="btn-save-controls" class="bg-emerald-700 text-white px-2.5 py-0.5 rounded text-[10px] uppercase">Done</button>
   </div>
 
-  <!-- ==========================================================================
-       GAME CANVAS & FLOATING TOUCH CONTROLS
-       ========================================================================== -->
+  <!-- CANVAS & CONTROLS -->
   <div id="canvas-container" class="relative flex-1 w-full h-full overflow-hidden">
     <canvas id="gameCanvas" class="w-full h-full"></canvas>
 
@@ -96,11 +90,7 @@
     </div>
   </div>
 
-  <!-- ==========================================================================
-       MODALS SECTION
-       ========================================================================== -->
-
-  <!-- AUTHENTICATION MODAL -->
+  <!-- MODALS -->
   <div id="modal-auth" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md hidden flex items-center justify-center p-4">
     <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
       <h1 class="text-3xl font-black italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 neon-text">TURBO MAZE</h1>
@@ -124,7 +114,6 @@
     </div>
   </div>
 
-  <!-- CONTROL ADJUSTMENT PROMPT MODAL -->
   <div id="modal-adjust-prompt" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex items-center justify-center p-4">
     <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
       <div class="w-12 h-12 bg-blue-500/20 border-2 border-blue-400 rounded-full flex items-center justify-center mx-auto text-blue-400 text-xl">
@@ -139,7 +128,6 @@
     </div>
   </div>
 
-  <!-- MAIN MENU MODAL -->
   <div id="modal-menu" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 space-y-4">
       <div class="flex justify-between items-center bg-slate-800 p-3 rounded-xl border border-slate-700">
@@ -186,7 +174,6 @@
     </div>
   </div>
 
-  <!-- DAILY CHALLENGE MENU MODAL -->
   <div id="modal-daily-menu" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
       <div class="w-12 h-12 bg-amber-500/20 border-2 border-amber-400 rounded-full flex items-center justify-center mx-auto text-amber-400 text-xl">
@@ -202,7 +189,6 @@
     </div>
   </div>
 
-  <!-- MULTIPLAYER SIZE SELECTION MODAL -->
   <div id="modal-mp-size" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
       <h2 class="text-xl font-bold text-white">Select Multiplayer Grid</h2>
@@ -221,7 +207,6 @@
     </div>
   </div>
 
-  <!-- MULTIPLAYER WAITING ROOM MODAL -->
   <div id="modal-waiting-room" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
       <div class="w-12 h-12 bg-indigo-500/20 border-2 border-indigo-400 rounded-full flex items-center justify-center mx-auto text-indigo-400 text-xl animate-spin">
@@ -242,7 +227,6 @@
     </div>
   </div>
 
-  <!-- PLAYER PROFILE MODAL -->
   <div id="modal-profile" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -271,7 +255,6 @@
     </div>
   </div>
 
-  <!-- CAMPAIGN MODAL -->
   <div id="modal-levels" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-2xl w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-3">
@@ -282,7 +265,6 @@
     </div>
   </div>
 
-  <!-- NIGHT DRIVE CAMPAIGN MODAL -->
   <div id="modal-night-levels" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-2xl w-full bg-slate-900 border border-purple-500/50 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-3">
@@ -293,7 +275,6 @@
     </div>
   </div>
 
-  <!-- TUNING GARAGE MODAL -->
   <div id="modal-garage" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -304,7 +285,6 @@
     </div>
   </div>
 
-  <!-- SETTINGS MODAL -->
   <div id="modal-settings" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b border-slate-800 pb-3">
@@ -345,7 +325,6 @@
     </div>
   </div>
 
-  <!-- LEADERBOARDS MODAL -->
   <div id="modal-leaderboards" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[85vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -369,7 +348,6 @@
     </div>
   </div>
 
-  <!-- REWARD TIERS MODAL -->
   <div id="modal-reward-tiers" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -397,35 +375,45 @@
     </div>
   </div>
 
-  <!-- FULL MAZE MAP MODAL -->
   <div id="modal-full-map" class="fixed inset-0 z-40 bg-slate-950/95 backdrop-blur-md hidden flex flex-col items-center justify-center p-4">
     <div class="w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-2xl p-4 flex flex-col h-[88vh]">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
-        <span id="full-map-title" class="font-bold text-white text-sm">Full Maze View</span>
-        <button onclick="closeModal('modal-full-map')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded-lg text-xs font-bold border border-slate-700">Close</button>
+        <div>
+          <span id="full-map-title" class="font-bold text-white text-sm">Full Maze View</span>
+          <span class="text-[10px] text-slate-400 ml-2">(1-Finger Drag to Pan • 2-Finger Pinch to Zoom)</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="resetFullMapTransform(); renderFullMazeMap();" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold">Reset View</button>
+          <button onclick="closeModal('modal-full-map')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded-lg text-xs font-bold border border-slate-700">Close</button>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4 text-[10px] text-slate-300 pb-2">
+        <span><span class="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-sm mr-1"></span>Start</span>
+        <span><span class="inline-block w-2.5 h-2.5 bg-amber-500 rounded-sm mr-1"></span>Finish</span>
+        <span><span class="inline-block w-2.5 h-2.5 bg-sky-400 rounded-sm mr-1"></span>Trail</span>
+        <span><span class="inline-block w-2.5 h-2.5 bg-red-500 rounded-full mr-1"></span>You</span>
       </div>
       <div class="flex-1 w-full h-full flex items-center justify-center bg-slate-950 rounded-xl overflow-hidden p-2">
-        <canvas id="fullMapCanvas" class="max-w-full max-h-full object-contain"></canvas>
+        <canvas id="fullMapCanvas" class="w-full h-full cursor-grab"></canvas>
       </div>
     </div>
   </div>
 
-  <!-- PAUSE MODAL -->
   <div id="modal-pause" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
     <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-3">
-      <h2 class="text-2xl font-black text-white">GAME PAUSED</h2>
+      <h2 id="pause-modal-title" class="text-2xl font-black text-white">GAME PAUSED</h2>
+      <p id="pause-modal-subtitle" class="text-[11px] text-amber-400 font-semibold hidden"></p>
       <div class="space-y-2 pt-2">
         <button onclick="togglePause()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm">Resume</button>
         <button onclick="openGarageModal()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5"><i class="fa-solid fa-wrench"></i><span>Tuning Garage</span></button>
         <button onclick="document.getElementById('modal-pause').classList.add('hidden'); startControlAdjustment();" class="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5"><i class="fa-solid fa-up-down-left-right"></i><span>Reposition Touch Controls</span></button>
         <button onclick="openSettingsModal()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-xs">Settings</button>
-        <button onclick="restartCurrentLevel()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-xs">Restart Level</button>
-        <button onclick="returnToMenuFromPause()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-xs">Main Menu</button>
+        <button id="btn-pause-restart" onclick="restartCurrentLevel()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-xs">Restart Level</button>
+        <button id="btn-pause-main-menu" onclick="returnToMenuFromPause()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-xs">Main Menu</button>
       </div>
     </div>
   </div>
 
-  <!-- COUNTDOWN MODAL -->
   <div id="modal-countdown" class="fixed inset-0 z-50 bg-slate-950/30 backdrop-blur-[2px] hidden flex flex-col items-center justify-center space-y-6 px-6 text-center pointer-events-none">
     <div id="countdown-number" class="text-6xl font-black italic tracking-wider text-amber-400 neon-text animate-pulse">3</div>
     <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl max-w-sm w-full shadow-2xl pointer-events-auto">
@@ -434,7 +422,6 @@
     </div>
   </div>
 
-  <!-- VICTORY MODAL -->
   <div id="modal-victory" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-emerald-500/50 rounded-2xl shadow-2xl p-5 text-center space-y-4">
       <h2 class="text-2xl font-black text-white">MAZE CONQUERED!</h2>
@@ -444,6 +431,7 @@
         <div id="victory-rank-display" class="text-xs font-mono text-blue-400">Rank #1 (World Record)</div>
         <div id="victory-coin-payout" class="text-xs font-bold text-yellow-400 mt-1">+10 Coins Earned!</div>
       </div>
+      <div id="victory-mp-standings" class="bg-slate-800/80 rounded-xl p-3 border border-slate-700 text-left max-h-36 overflow-y-auto hidden"></div>
       <div class="grid grid-cols-3 gap-2">
         <button onclick="returnToMenuFromVictory()" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs">Home</button>
         <button onclick="restartCurrentLevel()" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs">Retry</button>
