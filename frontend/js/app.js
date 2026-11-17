@@ -50,7 +50,7 @@ socket.on('waiting_countdown_tick', (data) => {
 });
 
 socket.on('start_multiplayer_race', (data) => {
-  console.log('[SOCKET] start_multiplayer_race received! Launching game...', data);
+  console.log('[SOCKET] start_multiplayer_race received! Launching shared maze...', data);
   window.currentRoomId = data.room_id;
   multiplayerGhosts = {};
   userCoins = Math.max(0, userCoins - 1);
@@ -58,9 +58,14 @@ socket.on('start_multiplayer_race', (data) => {
 
   document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
 
-  const gridSz = data.grid_size || 25;
-  const sharedSeed = data.seed || Math.floor(Math.random() * 10000);
-  const mpConfig = { id: 8888, name: "Multiplayer Arena", size: gridSz, seed: sharedSeed };
+  const gridSz = Number(data.grid_size) || 25;
+  const sharedSeed = Number(data.seed);
+  const mpConfig = {
+    id: `mp_${data.room_id}`,
+    name: "Multiplayer Arena",
+    size: gridSz,
+    seed: sharedSeed
+  };
   prepareAndStartLevel(mpConfig);
 });
 
