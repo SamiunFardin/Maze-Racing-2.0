@@ -23,7 +23,7 @@ rooms = {}
 GRID_MULTIPLIERS = {25: 1, 50: 4, 75: 9, 100: 16, 150: 36, 200: 64}
 
 async def start_race_for_room(room_id: str):
-    """Transitions room to racing state, deducts entry fee, and launches all clients."""
+    """Transitions room to racing state, deducts entry fee, and launches all clients with the exact same seed."""
     if room_id not in rooms:
         return
     room = rooms[room_id]
@@ -32,7 +32,9 @@ async def start_race_for_room(room_id: str):
 
     room["status"] = "racing"
     room["countdown_active"] = False
-    print(f"[SERVER] Launching race for room {room_id} with {len(room['players'])} players (Seed: {room['seed']}).")
+    room_seed = int(room["seed"])
+    room_grid_size = int(room["grid_size"])
+    print(f"[SERVER] Launching race for room {room_id} with {len(room['players'])} players (Seed: {room_seed}, Grid: {room_grid_size}).")
 
     for sid, pdata in list(room["players"].items()):
         username = pdata["username"]
@@ -43,8 +45,8 @@ async def start_race_for_room(room_id: str):
         "start_multiplayer_race",
         {
             "room_id": room_id,
-            "grid_size": room["grid_size"],
-            "seed": room["seed"]
+            "grid_size": room_grid_size,
+            "seed": room_seed
         },
         room=room_id
     )
@@ -120,14 +122,14 @@ async def join_multiplayer(sid, data):
         rooms[target_room] = {
             "room_id": target_room,
             "grid_size": grid_size,
-            "seed": random.randint(10000, 999999),
+            "seed": random.randint(100000, 999999),
             "players": {},
             "finishing_order": [],
             "status": "waiting",
             "countdown_active": False,
             "remaining": 10
         }
-        print(f"[SERVER] Created new room: {target_room}")
+        print(f"[SERVER] Created new room: {target_room} with shared seed: {rooms[target_room]['seed']}")
 
     rooms[target_room]["players"][sid] = {
         "username": username,
@@ -135,7 +137,6 @@ async def join_multiplayer(sid, data):
         "x": 0, "y": 0, "angle": 0
     }
 
-    # CRITICAL FIX: Must await enter_room in AsyncServer so room broadcasts actually reach this SID
     await sio.enter_room(sid, target_room)
     print(f"[SERVER] SID {sid} joined room {target_room}. Players: {len(rooms[target_room]['players'])}")
 
