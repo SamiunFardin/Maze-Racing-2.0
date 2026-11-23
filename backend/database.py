@@ -22,16 +22,18 @@ def get_or_create_user(username: str, password: str, color: str = "#3b82f6") -> 
             "password": password,
             "color": color,
             "coins": 100,  # Starting currency balance
+            "total_earned_coins": 100,  # Lifetime coins earned
             "completed_levels": [],
-            # Vehicle tuning parameters with unlocked limits and current configured values
+            "completed_night_levels": [],
+            # Vehicle tuning parameters with updated unlocked limits, steps, and current configured values
             "stats": {
                 "topSpeed": {"unlocked": 5.0, "current": 5.0, "min": 2.0, "max": 50.0, "step": 0.1},
-                "acceleration": {"unlocked": 0.03, "current": 0.03, "min": 0.01, "max": 0.30, "step": 0.01},
+                "acceleration": {"unlocked": 0.03, "current": 0.03, "min": 0.01, "max": 0.50, "step": 0.001},
                 "brake": {"unlocked": 0.04, "current": 0.04, "min": 0.01, "max": 0.50, "step": 0.01},
-                "turning": {"unlocked": 0.025, "current": 0.025, "min": 0.010, "max": 0.250, "step": 0.01},
+                "turning": {"unlocked": 0.025, "current": 0.025, "min": 0.010, "max": 0.50, "step": 0.001},
                 "drift": {"unlocked": 0.50, "current": 0.50, "min": 0.10, "max": 1.00, "step": 0.01},
-                "reverse": {"unlocked": 1.0, "current": 1.0, "min": 0.5, "max": 20.0, "step": 0.01},
-                "friction": {"unlocked": 0.975, "current": 0.975, "min": 0.850, "max": 0.999, "step": 0.01}
+                "reverse": {"unlocked": 1.0, "current": 1.0, "min": 0.5, "max": 20.0, "step": 0.1},
+                "friction": {"unlocked": 0.975, "current": 0.975, "min": 0.850, "max": 0.999, "step": 0.001}
             },
             "control_pos": {"bottom": 24, "left": 24},
             "bgm_volume": 0.8,
