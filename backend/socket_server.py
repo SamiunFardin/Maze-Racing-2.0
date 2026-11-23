@@ -252,6 +252,9 @@ async def player_finished(sid, data):
             username = room["players"][sid]["username"]
             if username in USERS_DB:
                 USERS_DB[username]["coins"] += payout
+                if "total_earned_coins" not in USERS_DB[username]:
+                    USERS_DB[username]["total_earned_coins"] = USERS_DB[username].get("coins", 100)
+                USERS_DB[username]["total_earned_coins"] += payout
 
             room["finishing_order"].append({
                 "sid": sid,
