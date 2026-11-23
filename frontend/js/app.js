@@ -8,7 +8,6 @@
 let currentUser = null;
 let userCoins = 100;
 let completedLevels = [];
-let completedNightLevels = [];
 let userStats = {};
 let currentAuthMode = 'login';
 let isNewRegistration = false;
@@ -53,6 +52,7 @@ socket.on('waiting_countdown_tick', (data) => {
 socket.on('start_multiplayer_race', (data) => {
   console.log('[SOCKET] start_multiplayer_race received! Launching shared maze...', data);
   window.currentRoomId = data.room_id;
+  // Sync backend start timestamp (server sends Unix seconds; convert to client ms)
   window.mpRaceStartTs = data.race_start_ts ? data.race_start_ts * 1000 : Date.now() + 3000;
   multiplayerGhosts = {};
   userCoins = Math.max(0, userCoins - 1);
@@ -210,14 +210,8 @@ function submitAuth(isAuto = false) {
       currentUser = response.body.username;
       userCoins = response.body.user_data.coins;
       completedLevels = response.body.user_data.completed_levels || [];
-      completedNightLevels = response.body.user_data.completed_night_levels || [];
       userStats = response.body.user_data.stats;
       car.color = response.body.user_data.color;
-
-      const colorPicker = document.getElementById('settings-color-picker');
-      if (colorPicker) colorPicker.value = car.color;
-      const authColorPicker = document.getElementById('auth-color-picker');
-      if (authColorPicker) authColorPicker.value = car.color;
 
       if (response.body.user_data.control_pos) {
         applyControlPosition(response.body.user_data.control_pos);
@@ -291,29 +285,12 @@ function renderGarageUI() {
             <span>Unlocked Cap: ${s.unlocked} (Max: ${s.max})</span>
             <span class="font-mono text-cyan-400 font-bold" id="val-${stat}">${s.current}</span>
           </div>
-          <div class="flex items-center space-x-2">
-            <button onclick="adjustStatStep('${stat}', -1)" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold">-</button>
-            <input type="range" id="range-${stat}" min="${s.min}" max="${s.unlocked}" step="${s.step}" value="${s.current}"
-              onchange="tuneCurrentStat('${stat}', this.value)" oninput="document.getElementById('val-${stat}').innerText = this.value" class="flex-1">
-            <button onclick="adjustStatStep('${stat}', 1)" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold">+</button>
-          </div>
+          <input type="range" min="${s.min}" max="${s.unlocked}" step="${s.step}" value="${s.current}"
+            onchange="tuneCurrentStat('${stat}', this.value)" oninput="document.getElementById('val-${stat}').innerText = this.value" class="w-full">
         </div>
       </div>
     `;
   }).join('');
-}
-
-function adjustStatStep(stat_name, direction) {
-  const s = userStats[stat_name];
-  if (!s) return;
-  let newVal = parseFloat((s.current + direction * s.step).toFixed(4));
-  newVal = Math.max(s.min, Math.min(s.unlocked, newVal));
-  s.current = newVal;
-  const rangeEl = document.getElementById(`range-${stat_name}`);
-  if (rangeEl) rangeEl.value = newVal;
-  const valEl = document.getElementById(`val-${stat_name}`);
-  if (valEl) valEl.innerText = newVal;
-  tuneCurrentStat(stat_name, newVal);
 }
 
 function upgradeStatCap(stat_name) {
@@ -452,21 +429,19 @@ function openDailyLeaderboard() {
   fetchLeaderboard(9999);
 }
 
-function handleCampaignVictory(level_id, time_ms, is_daily = false, is_night = false) {
+function handleCampaignVictory(level_id, time_ms, is_daily = false) {
   const mpStandingsBox = document.getElementById('victory-mp-standings');
   if (mpStandingsBox) mpStandingsBox.classList.add('hidden');
 
   fetch(`${backendUrl}/api/campaign/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: currentUser, level_id, time_ms, is_daily, is_night })
+    body: JSON.stringify({ username: currentUser, level_id, time_ms, is_daily })
   })
   .then(res => res.json())
   .then(data => {
     if (data.status === 'success') {
       userCoins = data.total_coins;
-      completedLevels = data.completed_levels || [];
-      completedNightLevels = data.completed_night_levels || [];
       updateHUDCoins();
       document.getElementById('victory-coin-payout').innerText = is_daily ? "Daily Challenge Completed!" : (data.first_time ? "+10 Coins (First Clear!)" : "+0 Coins (Already Cleared)");
       document.getElementById('victory-rank-display').innerText = `Rank #${data.rank} | World Record: ${formatTime(data.world_record)}`;
@@ -482,12 +457,12 @@ function closeModal(id) {
 
 function openLevelsModal() {
   openModal('modal-levels');
-  renderLevelSelector(CAMPAIGN_1300_LEVELS, 'levels-container', false);
+  renderLevelSelector(CAMPAIGN_100_LEVELS, 'levels-container');
 }
 
 function openNightDriveLevelsModal() {
   openModal('modal-night-levels');
-  renderLevelSelector(NIGHT_DRIVE_1300_LEVELS, 'night-levels-container', true);
+  renderLevelSelector(NIGHT_DRIVE_1300_LEVELS, 'night-levels-container');
 }
 
 function openGarageModal() {
@@ -508,7 +483,7 @@ function openSettingsModal() {
 function openProfileModal() {
   document.getElementById('profile-username').innerText = currentUser;
   document.getElementById('profile-coins').innerText = userCoins;
-  document.getElementById('profile-cleared-count').innerText = `${completedLevels.length}`;
+  document.getElementById('profile-cleared-count').innerText = `${completedLevels.length} / 2600`;
   document.getElementById('profile-total-wealth').innerText = userCoins;
   openModal('modal-profile');
 }
@@ -516,9 +491,9 @@ function openProfileModal() {
 function openLeaderboardsModal() {
   openModal('modal-leaderboards');
   const sel = document.getElementById('lb-level-select');
-  sel.innerHTML = `<option value="richest">💰 Richest Players (Lifetime Earned)</option>` +
+  sel.innerHTML = `<option value="richest">💰 Richest Players (Career Wealth)</option>` +
     `<option value="9999">🌟 Daily Challenge Arena</option>` + 
-    CAMPAIGN_1300_LEVELS.map(m => `<option value="${m.id}">${m.name} (${m.size}x${m.size})</option>`).join('') +
+    CAMPAIGN_100_LEVELS.map(m => `<option value="${m.id}">${m.name} (${m.size}x${m.size})</option>`).join('') +
     NIGHT_DRIVE_1300_LEVELS.map(m => `<option value="${10000 + m.id}">${m.name} (${m.size}x${m.size})</option>`).join('');
   fetchLeaderboard("richest");
 }
@@ -541,7 +516,7 @@ function fetchLeaderboard(level_id) {
         list.innerHTML = records.map((r, i) => `
           <div class="p-2.5 bg-slate-800 rounded-xl flex justify-between items-center text-xs">
             <span class="font-bold ${i===0?'text-amber-400':'text-slate-300'}">#${i+1} ${r.driver}</span>
-            <span class="font-mono text-yellow-400 font-bold"><i class="fa-solid fa-coins mr-1"></i>${r.coins} Earned</span>
+            <span class="font-mono text-yellow-400 font-bold"><i class="fa-solid fa-coins mr-1"></i>${r.coins} Coins</span>
           </div>
         `).join('');
       } else {
@@ -555,44 +530,37 @@ function fetchLeaderboard(level_id) {
     });
 }
 
-function renderLevelSelector(levelsArray, containerId, isNight = false) {
+function renderLevelSelector(levelsArray, containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
-  const progressList = isNight ? completedNightLevels : completedLevels;
-
   levelsArray.forEach(cfg => {
-    const isUnlocked = cfg.id === 1 || progressList.includes(cfg.id - 1);
-    if (!isUnlocked) return;
-
-    const isCleared = progressList.includes(cfg.id);
+    const isUnlocked = cfg.id === 1 || completedLevels.includes(cfg.id - 1);
+    const isCleared = completedLevels.includes(cfg.id);
 
     const card = document.createElement('div');
-    card.className = 'p-3 rounded-xl flex justify-between items-center bg-slate-800 cursor-pointer hover:bg-slate-700';
+    card.className = `p-3 rounded-xl flex justify-between items-center ${isUnlocked ? 'bg-slate-800 cursor-pointer hover:bg-slate-700' : 'bg-slate-900 opacity-50 cursor-not-allowed'}`;
     card.innerHTML = `
       <div>
         <div class="flex items-center space-x-2">
           <span class="font-bold text-xs text-white">${cfg.name} (${cfg.size}x${cfg.size})</span>
           ${isCleared ? '<span class="text-[9px] bg-emerald-900 text-emerald-300 px-1.5 py-0.5 rounded">Cleared</span>' : ''}
         </div>
-        <div class="text-[10px] text-slate-400 mt-0.5">Status: Unlocked</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Status: ${isUnlocked ? 'Unlocked' : 'Locked'}</div>
       </div>
-      <button class="bg-blue-600 text-white p-2 rounded-lg text-xs">
-        <i class="fa-solid fa-play"></i>
+      <button class="bg-blue-600 text-white p-2 rounded-lg text-xs" ${!isUnlocked ? 'disabled' : ''}>
+        <i class="fa-solid ${isUnlocked ? 'fa-play' : 'fa-lock'}"></i>
       </button>
     `;
 
-    card.onclick = () => prepareAndStartLevel(cfg);
+    if (isUnlocked) {
+      card.onclick = () => prepareAndStartLevel(cfg);
+    }
     container.appendChild(card);
   });
 }
 
 function updateCarColor(color) {
   car.color = color;
-  const authColorPicker = document.getElementById('auth-color-picker');
-  if (authColorPicker) authColorPicker.value = color;
-  const settingsColorPicker = document.getElementById('settings-color-picker');
-  if (settingsColorPicker) settingsColorPicker.value = color;
-
   fetch(`${backendUrl}/api/settings/color`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -644,6 +612,7 @@ function togglePause() {
   const menuBtn = document.getElementById('btn-pause-main-menu');
 
   if (isMultiplayerMatch()) {
+    // Multiplayer Pause Menu: Timer & race continue running in the background
     if (titleEl) titleEl.innerText = "MULTIPLAYER OPTIONS";
     if (subtitleEl) {
       subtitleEl.innerText = "Race timer stays live! Leaving forfeits rewards & places you last.";
@@ -653,6 +622,7 @@ function togglePause() {
     if (menuBtn) menuBtn.innerText = "Forfeit & Main Menu";
     pauseModal.classList.toggle('hidden', !isPaused);
   } else {
+    // Singleplayer Pause Menu: Stops timer & loop cleanly
     if (titleEl) titleEl.innerText = "GAME PAUSED";
     if (subtitleEl) subtitleEl.classList.add('hidden');
     if (restartBtn) restartBtn.classList.remove('hidden');
@@ -712,7 +682,7 @@ function playNextLevel() {
     return;
   }
   if (currentMaze && currentMaze.id < 1300) {
-    const listArray = currentMaze.isNightDrive ? NIGHT_DRIVE_1300_LEVELS : CAMPAIGN_1300_LEVELS;
+    const listArray = currentMaze.isNightDrive ? NIGHT_DRIVE_1300_LEVELS : CAMPAIGN_100_LEVELS;
     const nextCfg = listArray.find(m => m.id === currentMaze.id + 1);
     if (nextCfg) prepareAndStartLevel(nextCfg);
   }
