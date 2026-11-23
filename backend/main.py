@@ -36,6 +36,8 @@ async def authenticate_user(request: Request):
         if user["password"] != password:
             raise HTTPException(status_code=400, detail="Incorrect password.")
         user["color"] = color
+        if "total_earned_coins" not in user:
+            user["total_earned_coins"] = user.get("coins", 100)
 
     return {"status": "success", "username": username, "user_data": user}
 
@@ -47,11 +49,14 @@ async def complete_campaign(request: Request):
     level_id = int(data.get("level_id"))
     time_ms = float(data.get("time_ms"))
     is_daily = data.get("is_daily", False)
+    is_night = data.get("is_night", False)
 
     if username not in USERS_DB:
         raise HTTPException(status_code=404, detail="User not found")
 
     user = USERS_DB[username]
+    if "total_earned_coins" not in user:
+        user["total_earned_coins"] = user.get("coins", 100)
     earned_coins = 0
 
     if is_daily:
@@ -61,16 +66,21 @@ async def complete_campaign(request: Request):
         world_record = DAILY_LEADERBOARD[0]["timeMs"] if DAILY_LEADERBOARD else time_ms
         return {"status": "success", "earned_coins": 0, "total_coins": user["coins"], "rank": rank, "world_record": world_record}
 
-    first_time = level_id not in user["completed_levels"]
+    completed_list_key = "completed_night_levels" if is_night else "completed_levels"
+    first_time = level_id not in user[completed_list_key]
     if first_time:
-        user["completed_levels"].append(level_id)
+        user[completed_list_key].append(level_id)
         earned_coins = 10
         user["coins"] += earned_coins
+        user["total_earned_coins"] += earned_coins
 
-    lb = LEVEL_LEADERBOARDS.get(level_id, [])
+    lb_key = level_id + (10000 if is_night else 0)
+    if lb_key not in LEVEL_LEADERBOARDS:
+        LEVEL_LEADERBOARDS[lb_key] = []
+    lb = LEVEL_LEADERBOARDS[lb_key]
     lb.append({"driver": username, "timeMs": time_ms, "date": str(datetime.date.today())})
     lb.sort(key=lambda x: x["timeMs"])
-    LEVEL_LEADERBOARDS[level_id] = lb[:100]
+    LEVEL_LEADERBOARDS[lb_key] = lb[:100]
 
     rank = next((i + 1 for i, entry in enumerate(lb) if entry["driver"] == username), 0)
     world_record = lb[0]["timeMs"] if lb else time_ms
@@ -81,6 +91,7 @@ async def complete_campaign(request: Request):
         "earned_coins": earned_coins,
         "total_coins": user["coins"],
         "completed_levels": user["completed_levels"],
+        "completed_night_levels": user["completed_night_levels"],
         "rank": rank,
         "world_record": world_record
     }
@@ -149,9 +160,16 @@ async def update_controls(request: Request):
 
 @app.get("/api/leaderboard/richest")
 def get_richest_players():
-    """Returns top 10 players sorted by career coin wealth."""
-    sorted_users = sorted(USERS_DB.items(), key=lambda x: x[1]["coins"], reverse=True)
-    return [{"driver": uname, "coins": udata["coins"]} for uname, udata in sorted_users[:10]]
+    """Returns top 10 players sorted by lifetime coins earned."""
+    sorted_users = sorted(
+        USERS_DB.items(),
+        key=lambda x: x[1].get("total_earned_coins", x[1].get("coins", 0)),
+        reverse=True
+    )
+    return [
+        {"driver": uname, "coins": udata.get("total_earned_coins", udata.get("coins", 0))}
+        for uname, udata in sorted_users[:10]
+    ]
 
 @app.get("/api/leaderboard/level/{level_id}")
 def get_level_lb(level_id: int):
