@@ -128,6 +128,10 @@ let pauseStartedAt = 0;
 let elapsedTime = 0;
 let animFrameId = null;
 
+// Daily Challenge collision penalty state (2 seconds = 2000 ms per collision)
+const DAILY_COLLISION_PENALTY_MS = 2000;
+let dailyCollisionCount = 0;
+
 // Minimap bounding box for touch/click detection
 let minimapRect = { x: 0, y: 0, size: 110 };
 
@@ -168,6 +172,10 @@ function resizeCanvas() {
 
 function isMultiplayerMatch() {
   return Boolean(window.currentRoomId);
+}
+
+function isDailyChallengeMatch() {
+  return Boolean(currentMaze && currentMaze.isDaily);
 }
 
 function setupMinimapTap() {
@@ -368,7 +376,7 @@ function setupControlDragging() {
 
 const GAME_TIPS = [
   "Upgrade your car from the garage for better performance and higher top speeds!",
-  "Brake early before entering tight maze corners to avoid punishing wall recoils.",
+  "In Daily Challenge, every wall collision adds a +2.0s penalty to your final time!",
   "Larger multiplayer grids award massive doubled coin multipliers for 1st place!",
   "Tap the top-right minimap anytime to open the zoomable full maze map.",
   "Top-100 leaderboards pay out daily for Daily Challenge and weekly for Campaign levels!"
@@ -382,6 +390,7 @@ function prepareAndStartLevel(mazeConfig) {
   currentMaze = getOrGenerateMaze(mazeConfig);
   document.getElementById('hud-level-title').innerText = `${currentMaze.name} (${currentMaze.sizeLabel})`;
 
+  dailyCollisionCount = 0;
   carTrailPath = [];
   car.x = (currentMaze.start.x + 0.5) * TILE_SIZE;
   car.y = (currentMaze.start.y + 0.5) * TILE_SIZE;
@@ -483,6 +492,11 @@ function updatePhysics() {
     if (Math.abs(car.speed) > 1.0) audioEngine.playRecoilImpact();
     car.speed = -car.speed * 0.4;
     collided = true;
+  }
+
+  // Count each wall collision once per step during Daily Challenge mode
+  if (collided && !car.isColliding && isDailyChallengeMatch()) {
+    dailyCollisionCount += 1;
   }
 
   car.isColliding = collided;
@@ -827,7 +841,25 @@ function renderFullMazeMap() {
 function triggerVictory() {
   gameActive = false;
   audioEngine.playVictoryFanfare();
-  document.getElementById('victory-final-time').innerText = formatTime(elapsedTime);
+
+  const penaltyBox = document.getElementById('victory-daily-penalty-box');
+  let recordedTimeMs = elapsedTime;
+
+  if (isDailyChallengeMatch()) {
+    const penaltyMs = dailyCollisionCount * DAILY_COLLISION_PENALTY_MS;
+    recordedTimeMs = elapsedTime + penaltyMs;
+    if (penaltyBox) {
+      penaltyBox.classList.remove('hidden');
+      penaltyBox.innerHTML =
+        `<div>Race Time: <span class="font-mono text-slate-200">${formatTime(elapsedTime)}</span></div>` +
+        `<div>Collisions: <span class="font-mono text-rose-400 font-bold">${dailyCollisionCount}</span> × 2.000s = <span class="font-mono text-rose-400 font-bold">+${formatTime(penaltyMs)}</span></div>`;
+    }
+  } else if (penaltyBox) {
+    penaltyBox.classList.add('hidden');
+    penaltyBox.innerHTML = '';
+  }
+
+  document.getElementById('victory-final-time').innerText = formatTime(recordedTimeMs);
   document.getElementById('modal-victory').classList.remove('hidden');
 
   if (isMultiplayerMatch() && typeof socket !== 'undefined' && socket.connected) {
@@ -835,12 +867,12 @@ function triggerVictory() {
     document.getElementById('victory-coin-payout').innerText = "Syncing with server...";
     socket.emit('player_finished', {
       room_id: window.currentRoomId,
-      client_time_ms: elapsedTime
+      client_time_ms: recordedTimeMs
     });
   } else {
     handleCampaignVictory(
       currentMaze.id,
-      elapsedTime,
+      recordedTimeMs,
       Boolean(currentMaze.isDaily),
       Boolean(currentMaze.isNightDrive),
       Number(currentMaze.size || 25)
