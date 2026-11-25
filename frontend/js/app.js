@@ -1,13 +1,16 @@
 /**
  * app.js
  * ------
- * Frontend client controller managing UI modals, user authentication, 
- * local storage persistence, garage stats interaction, audio settings, and Socket.io event listeners.
+ * Frontend client controller managing UI modals, user authentication,
+ * local storage persistence, garage stats interaction, audio settings,
+ * lifetime earnings display, top-100 leaderboards, and Socket.io event listeners.
  */
 
 let currentUser = null;
 let userCoins = 100;
+let userLifetimeEarnings = 0;
 let completedLevels = [];
+let completedNightLevels = [];
 let userStats = {};
 let currentAuthMode = 'login';
 let isNewRegistration = false;
@@ -83,6 +86,21 @@ socket.on('ghost_removed', (data) => {
   }
 });
 
+socket.on('reward_payout_received', (data) => {
+  if (!currentUser || !data || !data.payouts) return;
+  const myPayouts = data.payouts.filter(p => p.driver === currentUser || !p.driver);
+  if (myPayouts.length > 0) {
+    const gained = myPayouts.reduce((sum, p) => sum + (p.coins || 0), 0);
+    if (gained > 0) {
+      userCoins += gained;
+      userLifetimeEarnings += gained;
+      updateHUDCoins();
+      const summary = myPayouts.map(p => `${p.source} (#${p.rank}): +${p.coins} coins`).join(' | ');
+      alert(`Leaderboard Reward Received!\n${summary}`);
+    }
+  }
+});
+
 function renderMultiplayerStandings(standings) {
   const box = document.getElementById('victory-mp-standings');
   if (!box) return;
@@ -112,6 +130,11 @@ socket.on('race_standings_update', (data) => {
 
 socket.on('player_payout', (data) => {
   userCoins = data.total_coins;
+  if (typeof data.lifetime_earnings === 'number') {
+    userLifetimeEarnings = data.lifetime_earnings;
+  } else {
+    userLifetimeEarnings += Number(data.payout || 0);
+  }
   updateHUDCoins();
   document.getElementById('victory-final-time').innerText = formatTime(data.time_ms);
   document.getElementById('victory-rank-display').innerText = `Multiplayer Rank #${data.rank} of ${data.total_players}`;
@@ -209,7 +232,9 @@ function submitAuth(isAuto = false) {
     if (response.status === 200) {
       currentUser = response.body.username;
       userCoins = response.body.user_data.coins;
+      userLifetimeEarnings = response.body.user_data.lifetime_earnings || 0;
       completedLevels = response.body.user_data.completed_levels || [];
+      completedNightLevels = response.body.user_data.completed_night_levels || [];
       userStats = response.body.user_data.stats;
       car.color = response.body.user_data.color;
 
@@ -222,6 +247,13 @@ function submitAuth(isAuto = false) {
 
       applyCarStats();
       updateHUDCoins();
+
+      if (Array.isArray(response.body.pending_rewards) && response.body.pending_rewards.length > 0) {
+        const msg = response.body.pending_rewards
+          .map(r => `${r.source} (Rank #${r.rank}): +${r.coins} Coins`)
+          .join('\n');
+        alert(`You received leaderboard rewards!\n${msg}`);
+      }
 
       document.getElementById('menu-player-name').innerText = currentUser;
       document.getElementById('modal-auth').classList.add('hidden');
@@ -303,6 +335,9 @@ function upgradeStatCap(stat_name) {
   .then(data => {
     if (data.status === 'success') {
       userCoins = data.coins;
+      if (typeof data.lifetime_earnings === 'number') {
+        userLifetimeEarnings = data.lifetime_earnings;
+      }
       userStats = data.stats;
       applyCarStats();
       updateHUDCoins();
@@ -429,21 +464,41 @@ function openDailyLeaderboard() {
   fetchLeaderboard(9999);
 }
 
-function handleCampaignVictory(level_id, time_ms, is_daily = false) {
+function handleCampaignVictory(level_id, time_ms, is_daily = false, is_night_drive = false, grid_size = 25) {
   const mpStandingsBox = document.getElementById('victory-mp-standings');
   if (mpStandingsBox) mpStandingsBox.classList.add('hidden');
 
   fetch(`${backendUrl}/api/campaign/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: currentUser, level_id, time_ms, is_daily })
+    body: JSON.stringify({
+      username: currentUser,
+      level_id,
+      time_ms,
+      is_daily,
+      is_night_drive,
+      grid_size
+    })
   })
   .then(res => res.json())
   .then(data => {
     if (data.status === 'success') {
       userCoins = data.total_coins;
+      if (typeof data.lifetime_earnings === 'number') {
+        userLifetimeEarnings = data.lifetime_earnings;
+      }
+      if (Array.isArray(data.completed_levels)) {
+        completedLevels = data.completed_levels;
+      }
+      if (Array.isArray(data.completed_night_levels)) {
+        completedNightLevels = data.completed_night_levels;
+      }
       updateHUDCoins();
-      document.getElementById('victory-coin-payout').innerText = is_daily ? "Daily Challenge Completed!" : (data.first_time ? "+10 Coins (First Clear!)" : "+0 Coins (Already Cleared)");
+      document.getElementById('victory-coin-payout').innerText = is_daily
+        ? "Daily Challenge Completed! (Top-100 Daily Rewards Paid Every Day)"
+        : (data.first_time
+            ? `+${data.earned_coins} Coins (First Clear!)`
+            : "+0 Coins (Already Cleared)");
       document.getElementById('victory-rank-display').innerText = `Rank #${data.rank} | World Record: ${formatTime(data.world_record)}`;
     }
   });
@@ -457,12 +512,12 @@ function closeModal(id) {
 
 function openLevelsModal() {
   openModal('modal-levels');
-  renderLevelSelector(CAMPAIGN_100_LEVELS, 'levels-container');
+  renderLevelSelector(CAMPAIGN_100_LEVELS, 'levels-container', false);
 }
 
 function openNightDriveLevelsModal() {
   openModal('modal-night-levels');
-  renderLevelSelector(NIGHT_DRIVE_1300_LEVELS, 'night-levels-container');
+  renderLevelSelector(NIGHT_DRIVE_1300_LEVELS, 'night-levels-container', true);
 }
 
 function openGarageModal() {
@@ -481,20 +536,21 @@ function openSettingsModal() {
 }
 
 function openProfileModal() {
+  const totalCleared = completedLevels.length + completedNightLevels.length;
   document.getElementById('profile-username').innerText = currentUser;
   document.getElementById('profile-coins').innerText = userCoins;
-  document.getElementById('profile-cleared-count').innerText = `${completedLevels.length} / 2600`;
-  document.getElementById('profile-total-wealth').innerText = userCoins;
+  document.getElementById('profile-cleared-count').innerText = `${totalCleared} / 2600`;
+  document.getElementById('profile-total-wealth').innerText = userLifetimeEarnings;
   openModal('modal-profile');
 }
 
 function openLeaderboardsModal() {
   openModal('modal-leaderboards');
   const sel = document.getElementById('lb-level-select');
-  sel.innerHTML = `<option value="richest">💰 Richest Players (Career Wealth)</option>` +
-    `<option value="9999">🌟 Daily Challenge Arena</option>` + 
-    CAMPAIGN_100_LEVELS.map(m => `<option value="${m.id}">${m.name} (${m.size}x${m.size})</option>`).join('') +
-    NIGHT_DRIVE_1300_LEVELS.map(m => `<option value="${10000 + m.id}">${m.name} (${m.size}x${m.size})</option>`).join('');
+  sel.innerHTML = `<option value="richest">💰 Richest Players (Lifetime Earnings)</option>` +
+    `<option value="9999">🌟 Daily Challenge Arena (Top 100 • Daily Payout)</option>` +
+    CAMPAIGN_100_LEVELS.map(m => `<option value="${m.id}">${m.name} (${m.size}x${m.size} • Weekly Payout)</option>`).join('') +
+    NIGHT_DRIVE_1300_LEVELS.map(m => `<option value="${10000 + m.id}">${m.name} (${m.size}x${m.size} • Weekly Payout)</option>`).join('');
   fetchLeaderboard("richest");
 }
 
@@ -503,24 +559,26 @@ function openRewardTiersModal() {
 }
 
 function fetchLeaderboard(level_id) {
-  const endpoint = level_id === "richest" ? `${backendUrl}/api/leaderboard/richest` : `${backendUrl}/api/leaderboard/level/${level_id}`;
+  const endpoint = level_id === "richest"
+    ? `${backendUrl}/api/leaderboard/richest`
+    : `${backendUrl}/api/leaderboard/level/${level_id}`;
   fetch(endpoint)
     .then(res => res.json())
     .then(records => {
       const list = document.getElementById('lb-list-container');
-      if (records.length === 0) {
-        list.innerHTML = '<div class="text-center text-slate-400 py-4 text-xs">No records yet.</div>';
+      if (!Array.isArray(records) || records.length === 0) {
+        list.innerHTML = '<div class="text-center text-slate-400 py-4 text-xs">No records yet (Top 100 shown).</div>';
         return;
       }
       if (level_id === "richest") {
-        list.innerHTML = records.map((r, i) => `
+        list.innerHTML = records.slice(0, 100).map((r, i) => `
           <div class="p-2.5 bg-slate-800 rounded-xl flex justify-between items-center text-xs">
             <span class="font-bold ${i===0?'text-amber-400':'text-slate-300'}">#${i+1} ${r.driver}</span>
-            <span class="font-mono text-yellow-400 font-bold"><i class="fa-solid fa-coins mr-1"></i>${r.coins} Coins</span>
+            <span class="font-mono text-emerald-400 font-bold"><i class="fa-solid fa-sack-dollar mr-1"></i>${r.lifetime_earnings ?? 0} Earned <span class="text-slate-400 text-[10px]">(${r.coins ?? 0} bal)</span></span>
           </div>
         `).join('');
       } else {
-        list.innerHTML = records.map((r, i) => `
+        list.innerHTML = records.slice(0, 100).map((r, i) => `
           <div class="p-2.5 bg-slate-800 rounded-xl flex justify-between items-center text-xs">
             <span class="font-bold ${i===0?'text-amber-400':'text-slate-300'}">#${i+1} ${r.driver}</span>
             <span class="font-mono text-emerald-400 font-bold">${formatTime(r.timeMs)}</span>
@@ -530,12 +588,13 @@ function fetchLeaderboard(level_id) {
     });
 }
 
-function renderLevelSelector(levelsArray, containerId) {
+function renderLevelSelector(levelsArray, containerId, isNight = false) {
   const container = document.getElementById(containerId);
+  const clearedSet = isNight ? completedNightLevels : completedLevels;
   container.innerHTML = '';
   levelsArray.forEach(cfg => {
-    const isUnlocked = cfg.id === 1 || completedLevels.includes(cfg.id - 1);
-    const isCleared = completedLevels.includes(cfg.id);
+    const isUnlocked = cfg.id === 1 || clearedSet.includes(cfg.id - 1);
+    const isCleared = clearedSet.includes(cfg.id);
 
     const card = document.createElement('div');
     card.className = `p-3 rounded-xl flex justify-between items-center ${isUnlocked ? 'bg-slate-800 cursor-pointer hover:bg-slate-700' : 'bg-slate-900 opacity-50 cursor-not-allowed'}`;
