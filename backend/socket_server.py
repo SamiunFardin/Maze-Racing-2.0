@@ -1,17 +1,60 @@
 """
 socket_server.py
 ----------------
-ASGI WebSocket server configuration using python-socketio to manage 
-real-time multiplayer lobby matchmaking, countdowns, race synchronization, forfeits, and payouts.
+ASGI WebSocket server configuration using python-socketio to manage
+real-time multiplayer lobby matchmaking, countdowns, race synchronization,
+forfeits, doubled grid multipliers, and background reward distribution.
 """
 
 import socketio
 import random
 import asyncio
 import time
+import datetime
+from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
-from backend.main import app as fastapi_app
-from backend.database import USERS_DB
+from backend.main import app as fastapi_app, process_scheduled_leaderboard_rewards, _record_user_payout_notification
+from backend.database import USERS_DB, credit_user_coins
+
+
+async def _reward_scheduler_loop():
+    """Periodically checks and distributes daily (every day) and weekly (every week) leaderboard rewards."""
+    while True:
+        try:
+            process_scheduled_leaderboard_rewards(datetime.datetime.now())
+            for uname, payouts in list(REWARD_STATE_REF["recent_payouts"].items()):
+                if payouts:
+                    total_new = sum(p["coins"] for p in payouts)
+                    await sio.emit(
+                        "reward_payout_received",
+                        {
+                            "payouts": payouts,
+                            "total_coins": USERS_DB[uname]["coins"] if uname in USERS_DB else 0,
+                            "lifetime_earnings": USERS_DB[uname].get("lifetime_earnings", 0) if uname in USERS_DB else 0,
+                            "total_awarded": total_new
+                        },
+                        skip_sid=None
+                    )
+                    REWARD_STATE_REF["recent_payouts"][uname] = []
+        except Exception as exc:
+            print(f"[REWARD SCHEDULER] Error: {exc}")
+        await asyncio.sleep(30)
+
+
+from backend.database import REWARD_STATE as REWARD_STATE_REF
+
+
+@asynccontextmanager
+async def _app_lifespan(app):
+    process_scheduled_leaderboard_rewards(datetime.datetime.now())
+    task = asyncio.create_task(_reward_scheduler_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+
+
+fastapi_app.router.lifespan_context = _app_lifespan
 
 # Initialize Socket.io Async Server
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*', ping_timeout=60, ping_interval=25)
@@ -21,7 +64,9 @@ socket_app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)
 fastapi_app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 
 rooms = {}
-GRID_MULTIPLIERS = {25: 1, 50: 4, 75: 9, 100: 16, 150: 36, 200: 64}
+# Doubled payout multipliers for each grid size
+GRID_MULTIPLIERS = {25: 2, 50: 8, 75: 18, 100: 32, 150: 72, 200: 128}
+
 
 async def start_race_for_room(room_id: str):
     """Transitions room to racing state, deducts entry fee, sets backend start timestamp, and launches all clients."""
@@ -33,6 +78,7 @@ async def start_race_for_room(room_id: str):
 
     room["status"] = "racing"
     room["countdown_active"] = False
+    room["initial_player_count"] = max(1, len(room["players"]))
     room_seed = int(room["seed"])
     room_grid_size = int(room["grid_size"])
     # Account for the 3-second pre-race "3-2-1-GO" overlay on clients
@@ -42,7 +88,7 @@ async def start_race_for_room(room_id: str):
     for sid, pdata in list(room["players"].items()):
         username = pdata["username"]
         if username in USERS_DB and USERS_DB[username]["coins"] >= 1:
-            USERS_DB[username]["coins"] -= 1
+            credit_user_coins(username, -1, count_as_earning=False)
 
     await sio.emit(
         "start_multiplayer_race",
@@ -54,6 +100,7 @@ async def start_race_for_room(room_id: str):
         },
         room=room_id
     )
+
 
 async def room_countdown_and_start(room_id: str):
     """10-second lobby countdown timer that broadcasts ticks and starts the race at 0."""
@@ -77,6 +124,7 @@ async def room_countdown_and_start(room_id: str):
     except Exception as e:
         print(f"[SERVER] Error in countdown for {room_id}: {e}")
         await start_race_for_room(room_id)
+
 
 def get_standings_payload(room: dict) -> list:
     """Computes final standings placing active finishers first and forfeited/disconnected players last."""
@@ -117,6 +165,7 @@ def get_standings_payload(room: dict) -> list:
 
     return standings
 
+
 async def handle_forfeit_or_disconnect(sid: str):
     """Handles a player leaving during lobby wait OR forfeiting mid-race."""
     for r_id, room in list(rooms.items()):
@@ -131,6 +180,7 @@ async def handle_forfeit_or_disconnect(sid: str):
                 if not room["players"]:
                     del rooms[r_id]
                 else:
+                    room["initial_player_count"] = len(room["players"])
                     player_list = [p["username"] for p in room["players"].values()]
                     await sio.emit(
                         "waiting_room_update",
@@ -157,9 +207,11 @@ async def handle_forfeit_or_disconnect(sid: str):
                     del rooms[r_id]
             break
 
+
 @sio.event
 async def connect(sid, environ):
     print(f"[SERVER] Client connected: {sid}")
+
 
 @sio.on('join_multiplayer')
 async def join_multiplayer(sid, data):
@@ -229,10 +281,12 @@ async def join_multiplayer(sid, data):
     if len(rooms[target_room]["players"]) >= 20 and rooms[target_room]["status"] == "waiting":
         await start_race_for_room(target_room)
 
+
 @sio.on('leave_multiplayer')
 async def leave_multiplayer(sid, data=None):
     print(f"[SERVER] leave_multiplayer / forfeit from {sid}")
     await handle_forfeit_or_disconnect(sid)
+
 
 @sio.on('player_finished')
 async def player_finished(sid, data):
@@ -246,12 +300,12 @@ async def player_finished(sid, data):
             elapsed_ms = max(0.0, (time.time() - room["race_start_ts"]) * 1000.0) if room["race_start_ts"] else float(data.get("client_time_ms", 0))
             rank = len(room["finishing_order"]) + 1
             total = max(1, room["initial_player_count"])
-            multiplier = GRID_MULTIPLIERS.get(room["grid_size"], 1)
+            multiplier = GRID_MULTIPLIERS.get(room["grid_size"], 2)
             payout = max(1, (total - rank + 1)) * multiplier
 
             username = room["players"][sid]["username"]
             if username in USERS_DB:
-                USERS_DB[username]["coins"] += payout
+                credit_user_coins(username, payout, count_as_earning=True)
 
             room["finishing_order"].append({
                 "sid": sid,
@@ -268,6 +322,7 @@ async def player_finished(sid, data):
                 "payout": payout,
                 "time_ms": elapsed_ms,
                 "total_coins": USERS_DB[username]["coins"] if username in USERS_DB else 0,
+                "lifetime_earnings": USERS_DB[username].get("lifetime_earnings", 0) if username in USERS_DB else 0,
                 "standings": standings
             }, room=sid)
 
@@ -279,6 +334,7 @@ async def player_finished(sid, data):
             ]
             if not active_remaining:
                 del rooms[room_id]
+
 
 @sio.on('player_move')
 async def player_move(sid, data):
@@ -305,6 +361,7 @@ async def player_move(sid, data):
             room=room_id,
             skip_sid=sid
         )
+
 
 @sio.event
 async def disconnect(sid):
