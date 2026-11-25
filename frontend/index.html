@@ -180,7 +180,7 @@
         <i class="fa-solid fa-calendar-day"></i>
       </div>
       <h2 class="text-xl font-bold text-white">Daily Challenge Arena</h2>
-      <p class="text-xs text-slate-400">Compete on today's globally synced 50x50 procedural track!</p>
+      <p class="text-xs text-slate-400">Compete on today's globally synced 50x50 procedural track! Top 100 earn rewards every day.</p>
       <div class="space-y-2 pt-2">
         <button onclick="startDailyChallenge()" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-sm shadow-lg">Start Race</button>
         <button onclick="openDailyLeaderboard()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700">View Leaderboard</button>
@@ -192,15 +192,15 @@
   <div id="modal-mp-size" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-center space-y-4">
       <h2 class="text-xl font-bold text-white">Select Multiplayer Grid</h2>
-      <p class="text-xs text-slate-400">Entry fee: 1 Coin (deducted upon race start). Larger grids yield massive payout multipliers!</p>
+      <p class="text-xs text-slate-400">Entry fee: 1 Coin (deducted upon race start). Doubled payout multipliers for every grid size!</p>
       
       <div class="grid grid-cols-2 gap-2">
-        <button onclick="joinMultiplayerWithGrid(25)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">25x25 (1x)</button>
-        <button onclick="joinMultiplayerWithGrid(50)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">50x50 (4x)</button>
-        <button onclick="joinMultiplayerWithGrid(75)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">75x75 (9x)</button>
-        <button onclick="joinMultiplayerWithGrid(100)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">100x100 (16x)</button>
-        <button onclick="joinMultiplayerWithGrid(150)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">150x150 (36x)</button>
-        <button onclick="joinMultiplayerWithGrid(200)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">200x200 (64x)</button>
+        <button onclick="joinMultiplayerWithGrid(25)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">25x25 (2x)</button>
+        <button onclick="joinMultiplayerWithGrid(50)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">50x50 (8x)</button>
+        <button onclick="joinMultiplayerWithGrid(75)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">75x75 (18x)</button>
+        <button onclick="joinMultiplayerWithGrid(100)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">100x100 (32x)</button>
+        <button onclick="joinMultiplayerWithGrid(150)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">150x150 (72x)</button>
+        <button onclick="joinMultiplayerWithGrid(200)" class="p-3 bg-slate-800 hover:bg-blue-600 rounded-xl font-bold text-xs">200x200 (128x)</button>
       </div>
 
       <button onclick="closeModal('modal-mp-size'); openModal('modal-menu');" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-xl">Back</button>
@@ -247,8 +247,8 @@
             <div id="profile-cleared-count" class="text-xl font-mono font-bold text-emerald-400 mt-1">0 / 2600</div>
           </div>
           <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 text-center">
-            <div class="text-[10px] text-slate-400 uppercase font-bold">Total Wealth</div>
-            <div id="profile-total-wealth" class="text-xl font-mono font-bold text-yellow-400 mt-1">100</div>
+            <div class="text-[10px] text-slate-400 uppercase font-bold">Lifetime Earnings</div>
+            <div id="profile-total-wealth" class="text-xl font-mono font-bold text-yellow-400 mt-1">0</div>
           </div>
         </div>
       </div>
@@ -328,20 +328,20 @@
   <div id="modal-leaderboards" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[85vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-        <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-trophy text-amber-400"></i> Track Records</h2>
+        <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-trophy text-amber-400"></i> Top 100 Leaderboards</h2>
         <button class="btn-close-modal text-slate-400 hover:text-white p-1" onclick="closeModal('modal-leaderboards')"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
 
       <div class="bg-gradient-to-r from-amber-900/40 to-yellow-900/40 border border-amber-500/40 p-3 rounded-xl flex justify-between items-center">
         <div>
-          <div class="text-[10px] uppercase font-bold text-amber-400">Weekly Reward Reset</div>
-          <div id="weekly-timer-val" class="text-xs font-mono font-bold text-white mt-0.5">06d 14h 32m</div>
+          <div class="text-[10px] uppercase font-bold text-amber-400">Daily Challenge • Weekly Levels</div>
+          <div id="weekly-timer-val" class="text-xs font-mono font-bold text-white mt-0.5">Auto Payout Active</div>
         </div>
         <button onclick="openRewardTiersModal()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow">Reward Tiers</button>
       </div>
 
       <div>
-        <label class="block text-[10px] uppercase text-slate-400 font-bold mb-1">Select Track / Leaderboard</label>
+        <label class="block text-[10px] uppercase text-slate-400 font-bold mb-1">Select Track / Leaderboard (Top 100)</label>
         <select id="lb-level-select" onchange="fetchLeaderboard(this.value)" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-bold focus:outline-none focus:border-blue-500"></select>
       </div>
       <div id="lb-list-container" class="space-y-2 overflow-y-auto flex-1 pr-1"></div>
@@ -349,27 +349,55 @@
   </div>
 
   <div id="modal-reward-tiers" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg hidden flex items-center justify-center p-4">
-    <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4">
+    <div class="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 space-y-4 max-h-[85vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-        <h2 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-award text-yellow-400"></i> Weekly Reward Tiers</h2>
+        <h2 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-award text-yellow-400"></i> Top 100 Reward Tiers (Daily & Weekly)</h2>
         <button class="btn-close-modal text-slate-400 hover:text-white p-1" onclick="closeModal('modal-reward-tiers')"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
-      <div class="space-y-2 text-xs">
-        <div class="bg-slate-800 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center">
+      <div class="space-y-1.5 text-xs overflow-y-auto pr-1">
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex justify-between items-center">
           <span class="font-bold text-amber-400">Rank #1</span>
-          <span class="font-mono text-yellow-400 font-bold">500 Coins + Gold Crown</span>
-        </div>
-        <div class="bg-slate-800 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center">
-          <span class="font-bold text-slate-200">Rank #2 - #5</span>
-          <span class="font-mono text-yellow-400 font-bold">200 Coins</span>
-        </div>
-        <div class="bg-slate-800 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center">
-          <span class="font-bold text-slate-300">Rank #6 - #10</span>
           <span class="font-mono text-yellow-400 font-bold">100 Coins</span>
         </div>
-        <div class="bg-slate-800 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center">
-          <span class="font-bold text-slate-400">Rank #11 - #25</span>
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-200">Rank #2 - #10</span>
           <span class="font-mono text-yellow-400 font-bold">50 Coins</span>
+        </div>
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-200">Rank #11 - #20</span>
+          <span class="font-mono text-yellow-400 font-bold">45 Coins</span>
+        </div>
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-300">Rank #21 - #30</span>
+          <span class="font-mono text-yellow-400 font-bold">30 Coins</span>
+        </div>
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-300">Rank #31 - #40</span>
+          <span class="font-mono text-yellow-400 font-bold">25 Coins</span>
+        </div>
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-300">Rank #41 - #50</span>
+          <span class="font-mono text-yellow-400 font-bold">20 Coins</span>
+        </div>
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-400">Rank #51 - #60</span>
+          <span class="font-mono text-yellow-400 font-bold">15 Coins</span>
+        </div>
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-400">Rank #61 - #70</span>
+          <span class="font-mono text-yellow-400 font-bold">12 Coins</span>
+        </div>
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-400">Rank #71 - #80</span>
+          <span class="font-mono text-yellow-400 font-bold">10 Coins</span>
+        </div>
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-400">Rank #81 - #90</span>
+          <span class="font-mono text-yellow-400 font-bold">8 Coins</span>
+        </div>
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex justify-between items-center">
+          <span class="font-bold text-slate-400">Rank #91 - #100</span>
+          <span class="font-mono text-yellow-400 font-bold">5 Coins</span>
         </div>
       </div>
     </div>
