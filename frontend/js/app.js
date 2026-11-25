@@ -3,7 +3,8 @@
  * ------
  * Frontend client controller managing UI modals, user authentication,
  * local storage persistence, garage stats interaction, audio settings,
- * lifetime earnings display, top-100 leaderboards, and Socket.io event listeners.
+ * lifetime earnings display, top-100 leaderboards, daily penalty breakdown,
+ * and Socket.io event listeners.
  */
 
 let currentUser = null;
