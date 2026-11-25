@@ -369,9 +369,9 @@ function setupControlDragging() {
 const GAME_TIPS = [
   "Upgrade your car from the garage for better performance and higher top speeds!",
   "Brake early before entering tight maze corners to avoid punishing wall recoils.",
-  "Larger multiplayer grids award massive exponential coin payouts for 1st place!",
+  "Larger multiplayer grids award massive doubled coin multipliers for 1st place!",
   "Tap the top-right minimap anytime to open the zoomable full maze map.",
-  "Daily challenges reset every 24 hours with a brand new procedural track for everyone."
+  "Top-100 leaderboards pay out daily for Daily Challenge and weekly for Campaign levels!"
 ];
 
 function getRandomTip() {
@@ -838,7 +838,13 @@ function triggerVictory() {
       client_time_ms: elapsedTime
     });
   } else {
-    handleCampaignVictory(currentMaze.id, elapsedTime, currentMaze.isDaily);
+    handleCampaignVictory(
+      currentMaze.id,
+      elapsedTime,
+      Boolean(currentMaze.isDaily),
+      Boolean(currentMaze.isNightDrive),
+      Number(currentMaze.size || 25)
+    );
   }
 }
 
