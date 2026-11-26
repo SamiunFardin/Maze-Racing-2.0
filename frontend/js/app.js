@@ -2,9 +2,9 @@
  * app.js
  * ------
  * Frontend client controller managing UI modals, user authentication,
- * local storage persistence, garage stats interaction, audio settings,
- * lifetime earnings display, top-100 leaderboards, daily penalty breakdown,
- * and Socket.io event listeners.
+ * fault-tolerant storage persistence (with fallback when localStorage is blocked),
+ * garage stats interaction, audio settings, lifetime earnings display,
+ * top-100 leaderboards, daily penalty breakdown, and Socket.io event listeners.
  */
 
 let currentUser = null;
@@ -18,6 +18,73 @@ let isNewRegistration = false;
 window.currentRoomId = null;
 window.mpRaceStartTs = null;
 let pendingJoinPayload = null;
+
+// Fault-tolerant storage wrapper: tries localStorage first, falls back safely if restricted
+const _memoryStorageFallback = new Map();
+
+function safeStorageGet(key) {
+  try {
+    if (window.localStorage) {
+      const val = window.localStorage.getItem(key);
+      if (val !== null && val !== undefined) return val;
+    }
+  } catch (err) {
+    // localStorage restricted or unavailable
+  }
+  try {
+    if (window.name && window.name.startsWith('__TM_STATE__:')) {
+      const parsed = JSON.parse(window.name.slice('__TM_STATE__:'.length));
+      if (parsed && Object.prototype.hasOwnProperty.call(parsed, key)) {
+        return parsed[key];
+      }
+    }
+  } catch (err) {
+    // Ignore malformed window.name
+  }
+  return _memoryStorageFallback.has(key) ? _memoryStorageFallback.get(key) : null;
+}
+
+function safeStorageSet(key, value) {
+  const strVal = String(value);
+  _memoryStorageFallback.set(key, strVal);
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(key, strVal);
+    }
+  } catch (err) {
+    // Fallback to window.name & memory when localStorage is blocked
+  }
+  try {
+    let currentObj = {};
+    if (window.name && window.name.startsWith('__TM_STATE__:')) {
+      currentObj = JSON.parse(window.name.slice('__TM_STATE__:'.length)) || {};
+    }
+    currentObj[key] = strVal;
+    window.name = '__TM_STATE__:' + JSON.stringify(currentObj);
+  } catch (err) {
+    // Ignore window.name serialization limits
+  }
+}
+
+function safeStorageRemove(key) {
+  _memoryStorageFallback.delete(key);
+  try {
+    if (window.localStorage) {
+      window.localStorage.removeItem(key);
+    }
+  } catch (err) {
+    // Ignore restricted storage
+  }
+  try {
+    if (window.name && window.name.startsWith('__TM_STATE__:')) {
+      const currentObj = JSON.parse(window.name.slice('__TM_STATE__:'.length)) || {};
+      delete currentObj[key];
+      window.name = '__TM_STATE__:' + JSON.stringify(currentObj);
+    }
+  } catch (err) {
+    // Ignore
+  }
+}
 
 const backendUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : window.location.origin;
 
@@ -159,11 +226,13 @@ window.addEventListener('load', () => {
     const splash = document.getElementById('splash-screen');
     if (splash) {
       splash.style.opacity = '0';
-      setTimeout(() => splash.remove(), 700);
+      setTimeout(() => {
+        if (splash && splash.parentNode) splash.remove();
+      }, 700);
     }
 
-    const savedUser = localStorage.getItem('tm_logged_username');
-    const savedPass = localStorage.getItem('tm_logged_password');
+    const savedUser = safeStorageGet('tm_logged_username');
+    const savedPass = safeStorageGet('tm_logged_password');
     if (savedUser && savedPass) {
       document.getElementById('auth-username').value = savedUser;
       document.getElementById('auth-password').value = savedPass;
@@ -213,6 +282,21 @@ function switchAuthTab(mode) {
   document.getElementById('auth-color-section').classList.toggle('hidden', !isSignup);
 }
 
+function normalizeStatsConfig(statsObj) {
+  const normalized = statsObj && typeof statsObj === 'object' ? { ...statsObj } : {};
+  if (normalized.turning && typeof normalized.turning === 'object') {
+    normalized.turning = {
+      ...normalized.turning,
+      min: 0.001,
+      max: 0.5,
+      step: 0.001,
+      unlocked: Math.min(0.5, Number(normalized.turning.unlocked ?? 0.025)),
+      current: Math.min(Math.min(0.5, Number(normalized.turning.unlocked ?? 0.025)), Number(normalized.turning.current ?? 0.025))
+    };
+  }
+  return normalized;
+}
+
 function submitAuth(isAuto = false) {
   const username = document.getElementById('auth-username').value.trim();
   const password = document.getElementById('auth-password').value;
@@ -236,15 +320,18 @@ function submitAuth(isAuto = false) {
       userLifetimeEarnings = response.body.user_data.lifetime_earnings || 0;
       completedLevels = response.body.user_data.completed_levels || [];
       completedNightLevels = response.body.user_data.completed_night_levels || [];
-      userStats = response.body.user_data.stats;
+      userStats = normalizeStatsConfig(response.body.user_data.stats);
       car.color = response.body.user_data.color;
+
+      const colorPicker = document.getElementById('settings-color-picker');
+      if (colorPicker && car.color) colorPicker.value = car.color;
 
       if (response.body.user_data.control_pos) {
         applyControlPosition(response.body.user_data.control_pos);
       }
 
-      localStorage.setItem('tm_logged_username', currentUser);
-      localStorage.setItem('tm_logged_password', password);
+      safeStorageSet('tm_logged_username', currentUser);
+      safeStorageSet('tm_logged_password', password);
 
       applyCarStats();
       updateHUDCoins();
@@ -267,41 +354,56 @@ function submitAuth(isAuto = false) {
       }
     } else {
       if (!isAuto) alert(response.body.detail);
-      localStorage.removeItem('tm_logged_username');
-      localStorage.removeItem('tm_logged_password');
+      safeStorageRemove('tm_logged_username');
+      safeStorageRemove('tm_logged_password');
+      document.getElementById('modal-auth').classList.remove('hidden');
+    }
+  })
+  .catch(() => {
+    if (!isAuto) {
+      alert("Unable to reach server. Please try again.");
+    } else {
       document.getElementById('modal-auth').classList.remove('hidden');
     }
   });
 }
 
 function applyCarStats() {
-  car.maxSpeed = userStats.topSpeed.current;
-  car.accel = userStats.acceleration.current;
-  car.brake = userStats.brake.current;
-  car.turnSpeed = userStats.turning.current;
-  car.friction = userStats.friction.current;
+  userStats = normalizeStatsConfig(userStats);
+  if (userStats.topSpeed) car.maxSpeed = userStats.topSpeed.current;
+  if (userStats.acceleration) car.accel = userStats.acceleration.current;
+  if (userStats.brake) car.brake = userStats.brake.current;
+  if (userStats.turning) car.turnSpeed = userStats.turning.current;
+  if (userStats.friction) car.friction = userStats.friction.current;
 }
 
 function updateHUDCoins() {
-  document.getElementById('hud-coins-val').innerText = userCoins;
-  document.getElementById('menu-coins-val').innerText = userCoins;
+  const hudCoinsEl = document.getElementById('hud-coins-val');
+  if (hudCoinsEl) hudCoinsEl.innerText = userCoins;
+  const menuCoinsEl = document.getElementById('menu-coins-val');
+  if (menuCoinsEl) menuCoinsEl.innerText = userCoins;
 }
 
 const STAT_NOTES = {
   topSpeed: "Increases max velocity. Higher = faster top speed, requires precise braking.",
   acceleration: "Increases velocity gain rate off the line.",
   brake: "Increases deceleration power when stopping before walls.",
-  turning: "Increases steering sensitivity for sharper corner cutting.",
+  turning: "Increases steering sensitivity (step: 0.001, max: 0.5) for sharper corner cutting.",
   drift: "Adjusts tire traction grip around difficult maze corners.",
   reverse: "Increases backing up speed out of dead ends.",
   friction: "Decreases momentum drag when letting go of gas."
 };
 
 function renderGarageUI() {
+  userStats = normalizeStatsConfig(userStats);
   const container = document.getElementById('garage-stats-container');
   container.innerHTML = Object.keys(userStats).map(stat => {
     const s = userStats[stat];
     const note = STAT_NOTES[stat] || "";
+    const minVal = stat === 'turning' ? 0.001 : s.min;
+    const maxCapVal = stat === 'turning' ? Math.min(0.5, s.unlocked) : s.unlocked;
+    const maxPossibleVal = stat === 'turning' ? 0.5 : s.max;
+    const stepVal = stat === 'turning' ? 0.001 : s.step;
     return `
       <div class="p-3 bg-slate-800 rounded-xl border border-slate-700 space-y-2">
         <div class="flex justify-between items-center">
@@ -315,10 +417,10 @@ function renderGarageUI() {
         </div>
         <div>
           <div class="flex justify-between text-[10px] text-slate-400 mb-1">
-            <span>Unlocked Cap: ${s.unlocked} (Max: ${s.max})</span>
+            <span>Unlocked Cap: ${maxCapVal} (Max: ${maxPossibleVal})</span>
             <span class="font-mono text-cyan-400 font-bold" id="val-${stat}">${s.current}</span>
           </div>
-          <input type="range" min="${s.min}" max="${s.unlocked}" step="${s.step}" value="${s.current}"
+          <input type="range" min="${minVal}" max="${maxCapVal}" step="${stepVal}" value="${s.current}"
             onchange="tuneCurrentStat('${stat}', this.value)" oninput="document.getElementById('val-${stat}').innerText = this.value" class="w-full">
         </div>
       </div>
@@ -339,7 +441,7 @@ function upgradeStatCap(stat_name) {
       if (typeof data.lifetime_earnings === 'number') {
         userLifetimeEarnings = data.lifetime_earnings;
       }
-      userStats = data.stats;
+      userStats = normalizeStatsConfig(data.stats);
       applyCarStats();
       updateHUDCoins();
       renderGarageUI();
@@ -358,7 +460,7 @@ function tuneCurrentStat(stat_name, value) {
   .then(res => res.json())
   .then(data => {
     if (data.status === 'success') {
-      userStats = data.stats;
+      userStats = normalizeStatsConfig(data.stats);
       applyCarStats();
     }
   });
@@ -505,10 +607,30 @@ function handleCampaignVictory(level_id, time_ms, is_daily = false, is_night_dri
   });
 }
 
-function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('hidden');
+}
 
 function closeModal(id) {
-  document.getElementById(id).classList.add('hidden');
+  const el = document.getElementById(id);
+  if (el) el.classList.add('hidden');
+
+  // Prevent blank screen / dead-end if closing a modal leaves no active modal or game screen visible
+  const anyModalOpen = Array.from(document.querySelectorAll('[id^="modal-"]'))
+    .some(m => !m.classList.contains('hidden'));
+
+  if (!anyModalOpen) {
+    if (gameActive && isPaused) {
+      openModal('modal-pause');
+    } else if (!gameActive) {
+      if (currentUser) {
+        openModal('modal-menu');
+      } else {
+        openModal('modal-auth');
+      }
+    }
+  }
 }
 
 function openLevelsModal() {
@@ -579,7 +701,19 @@ function fetchLeaderboard(level_id) {
           </div>
         `).join('');
       } else {
-        list.innerHTML = records.slice(0, 100).map((r, i) => `
+        // Ensure only best time per driver is shown even if cached/older data had duplicates
+        const bestByDriver = new Map();
+        records.forEach(r => {
+          const prev = bestByDriver.get(r.driver);
+          if (!prev || Number(r.timeMs) < Number(prev.timeMs)) {
+            bestByDriver.set(r.driver, r);
+          }
+        });
+        const uniqueRecords = Array.from(bestByDriver.values())
+          .sort((a, b) => Number(a.timeMs) - Number(b.timeMs))
+          .slice(0, 100);
+
+        list.innerHTML = uniqueRecords.map((r, i) => `
           <div class="p-2.5 bg-slate-800 rounded-xl flex justify-between items-center text-xs">
             <span class="font-bold ${i===0?'text-amber-400':'text-slate-300'}">#${i+1} ${r.driver}</span>
             <span class="font-mono text-emerald-400 font-bold">${formatTime(r.timeMs)}</span>
@@ -696,6 +830,8 @@ function togglePause() {
         pausedTimeTotal += performance.now() - pauseStartedAt;
         pauseStartedAt = 0;
       }
+      lastFrameTime = performance.now();
+      physicsAccumulator = 0;
       gameLoop();
     }
   }
