@@ -18,6 +18,7 @@ from backend.database import (
     LEVEL_LEADERBOARDS,
     DAILY_LEADERBOARD,
     REWARD_STATE,
+    save_database_state,
 )
 
 app = FastAPI(title="Turbo Maze Racer API")
@@ -33,6 +34,7 @@ def _record_user_payout_notification(username: str, source_label: str, rank: int
         "coins": coins,
         "timestamp": datetime.datetime.utcnow().isoformat()
     })
+    save_database_state()
 
 
 def _distribute_board_rewards(entries: list, source_label: str) -> int:
@@ -47,6 +49,20 @@ def _distribute_board_rewards(entries: list, source_label: str) -> int:
     return total_awarded
 
 
+def _upsert_best_player_time(board: list, driver: str, time_ms: float, date_str: str) -> list:
+    """Keeps only a single best (lowest time_ms) entry per player on the leaderboard."""
+    existing = next((item for item in board if item.get("driver") == driver), None)
+    if existing is not None:
+        if float(time_ms) < float(existing.get("timeMs", float("inf"))):
+            existing["timeMs"] = float(time_ms)
+            existing["date"] = date_str
+    else:
+        board.append({"driver": driver, "timeMs": float(time_ms), "date": date_str})
+    board.sort(key=lambda x: float(x["timeMs"]))
+    del board[100:]
+    return board
+
+
 def process_scheduled_leaderboard_rewards(now: datetime.datetime | None = None):
     """
     Ensures daily challenge rewards are paid out every day and level leaderboard
@@ -58,6 +74,7 @@ def process_scheduled_leaderboard_rewards(now: datetime.datetime | None = None):
 
     today_str = str(now.date())
     current_week = now.isocalendar()[:2]
+    changed = False
 
     # 1. Daily Challenge Leaderboard (every day)
     if REWARD_STATE["last_daily_date"] != today_str:
@@ -66,6 +83,7 @@ def process_scheduled_leaderboard_rewards(now: datetime.datetime | None = None):
             _distribute_board_rewards(DAILY_LEADERBOARD[:100], f"Daily Challenge ({REWARD_STATE['last_daily_date']})")
             DAILY_LEADERBOARD.clear()
         REWARD_STATE["last_daily_date"] = today_str
+        changed = True
 
     # 2. Level Leaderboards (every week)
     if REWARD_STATE["last_weekly_period"] != current_week:
@@ -76,6 +94,10 @@ def process_scheduled_leaderboard_rewards(now: datetime.datetime | None = None):
                 _distribute_board_rewards(lb[:100], f"Level {lb_id} Weekly (W{prev_wk}/{prev_year})")
                 lb.clear()
         REWARD_STATE["last_weekly_period"] = current_week
+        changed = True
+
+    if changed:
+        save_database_state()
 
 
 @app.post("/api/auth")
@@ -99,12 +121,16 @@ async def authenticate_user(request: Request):
     else:
         if username not in USERS_DB:
             raise HTTPException(status_code=400, detail="Account not found. Please Sign Up first.")
-        user = USERS_DB[username]
+        user = get_or_create_user(username, password, color)
         if user["password"] != password:
             raise HTTPException(status_code=400, detail="Incorrect password.")
         user["color"] = color
+        save_database_state()
 
     pending_rewards = REWARD_STATE["recent_payouts"].pop(username, [])
+    if pending_rewards:
+        save_database_state()
+
     return {
         "status": "success",
         "username": username,
@@ -120,6 +146,8 @@ async def get_pending_rewards(username: str):
     if username not in USERS_DB:
         return {"pending_rewards": [], "coins": 0, "lifetime_earnings": 0}
     rewards = REWARD_STATE["recent_payouts"].pop(username, [])
+    if rewards:
+        save_database_state()
     user = USERS_DB[username]
     return {
         "pending_rewards": rewards,
@@ -145,11 +173,11 @@ async def complete_campaign(request: Request):
 
     user = USERS_DB[username]
     earned_coins = 0
+    today_str = str(datetime.date.today())
 
     if is_daily:
-        DAILY_LEADERBOARD.append({"driver": username, "timeMs": time_ms, "date": str(datetime.date.today())})
-        DAILY_LEADERBOARD.sort(key=lambda x: x["timeMs"])
-        del DAILY_LEADERBOARD[100:]
+        _upsert_best_player_time(DAILY_LEADERBOARD, username, time_ms, today_str)
+        save_database_state()
         rank = next((i + 1 for i, entry in enumerate(DAILY_LEADERBOARD) if entry["driver"] == username), 0)
         world_record = DAILY_LEADERBOARD[0]["timeMs"] if DAILY_LEADERBOARD else time_ms
         return {
@@ -170,12 +198,11 @@ async def complete_campaign(request: Request):
 
     lb_key = (10000 + level_id) if is_night_drive else level_id
     lb = LEVEL_LEADERBOARDS.setdefault(lb_key, [])
-    lb.append({"driver": username, "timeMs": time_ms, "date": str(datetime.date.today())})
-    lb.sort(key=lambda x: x["timeMs"])
-    LEVEL_LEADERBOARDS[lb_key] = lb[:100]
+    _upsert_best_player_time(lb, username, time_ms, today_str)
+    save_database_state()
 
-    rank = next((i + 1 for i, entry in enumerate(LEVEL_LEADERBOARDS[lb_key]) if entry["driver"] == username), 0)
-    world_record = LEVEL_LEADERBOARDS[lb_key][0]["timeMs"] if LEVEL_LEADERBOARDS[lb_key] else time_ms
+    rank = next((i + 1 for i, entry in enumerate(lb) if entry["driver"] == username), 0)
+    world_record = lb[0]["timeMs"] if lb else time_ms
 
     return {
         "status": "success",
@@ -206,10 +233,14 @@ async def upgrade_stat(request: Request):
 
     if stat_name in user["stats"]:
         st = user["stats"][stat_name]
+        if stat_name == "turning":
+            st["max"] = 0.5
+            st["step"] = 0.001
         if st["unlocked"] < st["max"]:
             credit_user_coins(username, -10, count_as_earning=False)
             st["unlocked"] = round(min(st["max"], st["unlocked"] + st["step"]), 4)
             st["current"] = st["unlocked"]
+            save_database_state()
 
     return {
         "status": "success",
@@ -233,8 +264,12 @@ async def tune_stat(request: Request):
     user = USERS_DB[username]
     if stat_name in user["stats"]:
         st = user["stats"][stat_name]
+        if stat_name == "turning":
+            st["max"] = 0.5
+            st["step"] = 0.001
         if val <= st["unlocked"]:
             st["current"] = val
+            save_database_state()
 
     return {"status": "success", "stats": user["stats"]}
 
@@ -247,6 +282,7 @@ async def update_color(request: Request):
     color = data.get("color")
     if username in USERS_DB:
         USERS_DB[username]["color"] = color
+        save_database_state()
     return {"status": "success"}
 
 
@@ -258,6 +294,7 @@ async def update_controls(request: Request):
     pos = data.get("pos")
     if username in USERS_DB:
         USERS_DB[username]["control_pos"] = pos
+        save_database_state()
     return {"status": "success"}
 
 
@@ -282,8 +319,10 @@ def get_richest_players():
 
 @app.get("/api/leaderboard/level/{level_id}")
 def get_level_lb(level_id: int):
-    """Returns top 100 fastest times for a specific campaign, night-drive, or daily challenge level."""
+    """Returns top 100 fastest unique-player times for a specific campaign, night-drive, or daily challenge level."""
     process_scheduled_leaderboard_rewards()
-    if level_id == 9999:
-        return DAILY_LEADERBOARD[:100]
-    return LEVEL_LEADERBOARDS.get(level_id, [])[:100]
+    raw_board = DAILY_LEADERBOARD if level_id == 9999 else LEVEL_LEADERBOARDS.get(level_id, [])
+    deduped = []
+    for entry in sorted(raw_board, key=lambda x: float(x["timeMs"])):
+        _upsert_best_player_time(deduped, entry["driver"], entry["timeMs"], entry.get("date", ""))
+    return deduped[:100]
