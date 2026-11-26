@@ -36,15 +36,16 @@
       </button>
       <div>
         <div id="hud-level-title" class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Level 1</div>
-        <div id="hud-timer" class="text-lg font-mono font-bold text-amber-400">00:00.000</div>
+        <div class="flex items-center space-x-2">
+          <div id="hud-timer" class="text-lg font-mono font-bold text-amber-400">00:00.000</div>
+          <div id="hud-daily-collisions" class="bg-rose-950/90 border border-rose-500/50 text-rose-300 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold hidden">
+            <i class="fa-solid fa-car-burst mr-1"></i><span id="hud-daily-collisions-val">0</span>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="flex items-center space-x-2">
-      <div class="bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-lg flex items-center space-x-1.5 mr-1">
-        <i class="fa-solid fa-coins text-yellow-400 text-xs"></i>
-        <span id="hud-coins-val" class="font-mono font-bold text-yellow-400 text-xs">100</span>
-      </div>
       <button id="btn-pause-game" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow-md flex items-center space-x-1">
         <i class="fa-solid fa-pause"></i><span>Pause</span>
       </button>
