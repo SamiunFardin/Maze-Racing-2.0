@@ -128,12 +128,18 @@ let pauseStartedAt = 0;
 let elapsedTime = 0;
 let animFrameId = null;
 
+// Fixed-timestep physics accumulator (60 Hz reference step) so speed is identical across all devices/refresh rates
+const FIXED_PHYSICS_DT = 1 / 60;
+const MAX_FRAME_DT = 0.05;
+let lastFrameTime = 0;
+let physicsAccumulator = 0;
+
 // Daily Challenge collision penalty state (2 seconds = 2000 ms per collision)
 const DAILY_COLLISION_PENALTY_MS = 2000;
 let dailyCollisionCount = 0;
 
 // Minimap bounding box for touch/click detection
-let minimapRect = { x: 0, y: 0, size: 110 };
+let minimapRect = { x: 0, y: 76, size: 110 };
 
 // Full Map Zoom & Pan state
 let fullMapState = {
@@ -176,6 +182,18 @@ function isMultiplayerMatch() {
 
 function isDailyChallengeMatch() {
   return Boolean(currentMaze && currentMaze.isDaily);
+}
+
+function updateHUDDailyCollisions() {
+  const badge = document.getElementById('hud-daily-collisions');
+  const valEl = document.getElementById('hud-daily-collisions-val');
+  if (!badge || !valEl) return;
+  if (isDailyChallengeMatch()) {
+    badge.classList.remove('hidden');
+    valEl.innerText = dailyCollisionCount;
+  } else {
+    badge.classList.add('hidden');
+  }
 }
 
 function setupMinimapTap() {
@@ -391,6 +409,7 @@ function prepareAndStartLevel(mazeConfig) {
   document.getElementById('hud-level-title').innerText = `${currentMaze.name} (${currentMaze.sizeLabel})`;
 
   dailyCollisionCount = 0;
+  updateHUDDailyCollisions();
   carTrailPath = [];
   car.x = (currentMaze.start.x + 0.5) * TILE_SIZE;
   car.y = (currentMaze.start.y + 0.5) * TILE_SIZE;
@@ -436,9 +455,13 @@ function prepareAndStartLevel(mazeConfig) {
 
 function startGameLoop() {
   document.getElementById('game-hud').classList.remove('hidden');
+  updateHUDDailyCollisions();
   gameActive = true;
   isPaused = false;
-  startTime = performance.now();
+  const now = performance.now();
+  startTime = now;
+  lastFrameTime = now;
+  physicsAccumulator = 0;
   pausedTimeTotal = 0;
   pauseStartedAt = 0;
   if (animFrameId) cancelAnimationFrame(animFrameId);
@@ -497,6 +520,7 @@ function updatePhysics() {
   // Count each wall collision once per step during Daily Challenge mode
   if (collided && !car.isColliding && isDailyChallengeMatch()) {
     dailyCollisionCount += 1;
+    updateHUDDailyCollisions();
   }
 
   car.isColliding = collided;
@@ -553,10 +577,29 @@ function renderWorld() {
   ctx.rotate(-car.angle);
   ctx.translate(-car.x, -car.y);
 
-  for (let r = 0; r < currentMaze.rows; r++) {
-    for (let c = 0; c < currentMaze.cols; c++) {
+  // View culling: only iterate and draw maze tiles within the rotated viewport radius
+  const halfDiag = Math.hypot(screenCenterX, screenCenterY);
+  const cullRadius = halfDiag + TILE_SIZE * 1.5;
+  const cullRadiusSq = cullRadius * cullRadius;
+
+  const minCol = Math.max(0, Math.floor((car.x - cullRadius) / TILE_SIZE));
+  const maxCol = Math.min(currentMaze.cols - 1, Math.floor((car.x + cullRadius) / TILE_SIZE));
+  const minRow = Math.max(0, Math.floor((car.y - cullRadius) / TILE_SIZE));
+  const maxRow = Math.min(currentMaze.rows - 1, Math.floor((car.y + cullRadius) / TILE_SIZE));
+
+  for (let r = minRow; r <= maxRow; r++) {
+    const y = r * TILE_SIZE;
+    const centerY = y + TILE_SIZE * 0.5;
+    const dy = centerY - car.y;
+    const dySq = dy * dy;
+
+    for (let c = minCol; c <= maxCol; c++) {
       const x = c * TILE_SIZE;
-      const y = r * TILE_SIZE;
+      const centerX = x + TILE_SIZE * 0.5;
+      const dx = centerX - car.x;
+
+      if (dx * dx + dySq > cullRadiusSq) continue;
+
       if (currentMaze.grid[r][c] === 1) {
         ctx.fillStyle = '#1e293b'; ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
         ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
@@ -652,8 +695,10 @@ function renderWorld() {
 
 function renderMiniMap() {
   const mapSize = 110;
+  const hudEl = document.getElementById('game-hud');
+  const hudRect = hudEl && !hudEl.classList.contains('hidden') ? hudEl.getBoundingClientRect() : null;
   const x = canvas.width - mapSize - 12;
-  const y = 65;
+  const y = hudRect ? Math.max(76, Math.round(hudRect.bottom + 10)) : 76;
   minimapRect = { x, y, size: mapSize };
 
   ctx.save();
@@ -732,11 +777,6 @@ function renderMiniMap() {
   ctx.fill();
   ctx.restore();
 
-  // Subtle "TAP" hint label
-  ctx.fillStyle = 'rgba(226, 232, 240, 0.75)';
-  ctx.font = 'bold 8px sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText('TAP MAP', x + mapSize - 4, y + mapSize - 4);
   ctx.restore();
 }
 
@@ -880,16 +920,26 @@ function triggerVictory() {
   }
 }
 
-function gameLoop() {
+function gameLoop(now = performance.now()) {
   if (!gameActive) return;
 
   // In Singleplayer, pause freezes physics & timer.
   // In Multiplayer, the race timer and world never stop even if the pause overlay is open!
   if (isPaused && !isMultiplayerMatch()) {
+    lastFrameTime = now;
     return;
   }
 
-  updatePhysics();
+  const rawDt = (now - lastFrameTime) / 1000;
+  lastFrameTime = now;
+  const clampedDt = Math.max(0, Math.min(rawDt, MAX_FRAME_DT));
+  physicsAccumulator += clampedDt;
+
+  while (physicsAccumulator >= FIXED_PHYSICS_DT && gameActive) {
+    updatePhysics();
+    physicsAccumulator -= FIXED_PHYSICS_DT;
+  }
+
   renderWorld();
 
   // Keep full map live-updated if it is currently open while racing
@@ -901,7 +951,7 @@ function gameLoop() {
   if (isMultiplayerMatch() && window.mpRaceStartTs) {
     elapsedTime = Math.max(0, Date.now() - window.mpRaceStartTs);
   } else {
-    elapsedTime = performance.now() - startTime - pausedTimeTotal;
+    elapsedTime = now - startTime - pausedTimeTotal;
   }
 
   document.getElementById('hud-timer').innerText = formatTime(elapsedTime);
